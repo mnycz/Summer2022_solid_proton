@@ -9,19 +9,32 @@
 #include <map> //Error Matrix --- use map to store the entires --- then fill the matrix
 #include "TComplex.h"
 #include "TMatrixT.h"
+#include <TCanvas.h> // . Added this and below T things for plotting
+#include <TGraph.h>  // . added this for plotting
+#include <TLegend.h>
+#include "TGraphErrors.h"
+#include "TROOT.h"
+#include "TH1F.h"
+#include "TF1.h"
+#include "TCanvas.h"
+#include "TApplication.h"
+//#include <TPolarGraph.h>
+//TApplication tapp("app", 0, 0); // this is needed for some reason - not ideal
+//#include "TCanvas.h"
 using namespace std;
 using namespace LHAPDF;
+
+// USER INPUTS:
+const Double_t RUNTIME_DAYS = 90.0;  // Number of days the experiment runs
+const Double_t BEAM_POLARIZ  =0.85;  // Beam polarization
+const Double_t SIN2_TH = 0.235;  // Sin^2(theta_w), (theta_w is the weak mixing angle)
+const vector<string> PDF_names = {"CT18NLO"};  // Vector of  PDFs to analyze
 
 // Create a new type that can return two values
 struct Asym_Values{
   double Fit_Val;
   double Fixed_Val;
 };
-Double_t x = 0.0;
-Double_t Q2 = 0.0;
-Double_t rate = 0.0;  // . Delete this? And maybe Q2 and x?
-Double_t SIN2_TH = 0.235;  
-
 double r_prime=0.0;
 
 const Double_t GF = 1.16637e-5;  // GeV^2, Fermi constant
@@ -29,8 +42,6 @@ const Double_t ALPHA = 7.2973525e-3;  // Fine structure constant
 const Double_t MP = 0.93828;  // GeV/c^2 Mass of a proton
 const Double_t MN = 0.93957;
 const Double_t MZ = 91.188;
-const Double_t RUNTIME_DAYS = 90.0;
-const Double_t BEAM_POLARIZ  =0.85;  // . edited from .8 to .85
 const Int_t MAXBINS = 500;
 
 const Double_t Qu = 2.0/3.0;
@@ -57,11 +68,25 @@ Double_t Gcbar[MAXBINS];
 Double_t Gs[MAXBINS];
 Double_t Gsbar[MAXBINS];
 Double_t Gy[MAXBINS];
+Double_t GY[MAXBINS];  // . added this
+Double_t GA_const[MAXBINS];  // . added this
 Double_t Ga_rand[MAXBINS];
 Double_t Gda[MAXBINS];
 Double_t GdApvu_rel[MAXBINS];  // . use or delete
 Double_t GdApv_rel[MAXBINS];  // . use or delete (check for other unused vars)
 Double_t Ggoodness[MAXBINS];
+
+Int_t start_i = 0;  // . added Values for when to start the next x
+Int_t stop_i = 0;
+
+Double_t du_A_err[MAXBINS];  // . added // Error in d/u due to A
+Double_t du_sin2th_err[MAXBINS];  // . added // Error in d.u due to sin^2(theta)
+//Double_t du_fitted[MAXBINS]; // . added // Container for fitted d/u values
+std::vector<std::vector<double>> du_fitted(sizeof(PDF_names), vector<double>(0));
+std::vector<std::vector<double>> du_f_err(sizeof(PDF_names), vector<double>(0));
+std::vector<std::vector<double>> du_x(sizeof(PDF_names), vector<double>(0));
+//std::cout << du_fitted << ", " << PDF_names << endl;
+//std::cout << du_fitted << ", " << PDF_names << endl;
 
 Double_t GApv[MAXBINS];
 Double_t GcalcA[MAXBINS];
@@ -115,7 +140,6 @@ void calcAsym(string fileName, string pdfName, double beamE) {
   //Double_t PDF_error=0.0;
 
   const PDF* pdf = mkPDF(pdfName, 0);
-  // . change from fstream to ifstream and commented out fstream::in from the .open
   fstream inputFile;
   cout<<"fileName="<<","<<fileName<<endl;
   inputFile.open(fileName,fstream::in);
@@ -123,6 +147,15 @@ void calcAsym(string fileName, string pdfName, double beamE) {
   // Set up random variables for use in generating pseudodata
   TRandom *random = new TRandom();
   r_prime = random->Gaus();  // Random variable to be used with correlated systematic uncertainties
+
+  // Get coupling constants
+  double C_1d = 1/2. - 2 * SIN2_TH / 3;
+  double C_1u = -1/2. + 4 * SIN2_TH / 3;
+  double C_2d = 1/2. - 2 * SIN2_TH;
+  double C_2u = -1/2. + 2 * SIN2_TH;
+  cout << "SIN2_TH=" <<  SIN2_TH << ", C_1d=" << C_1d;
+  cout << ", C_1u=" << C_1u << ", C_2d=" << C_2d << ", C_2u=";
+  cout << C_2u << endl;
 
   // Read data from the input file and use it (along with pdfs) to create pseudodata
   string file_line;
@@ -170,34 +203,25 @@ void calcAsym(string fileName, string pdfName, double beamE) {
     double u_V = Gu[i] - Gubar[i];
     double s_V = Gs[i] - Gsbar[i];
     double c_V = Gc[i] - Gcbar[i];
-    cout << "d_p=" <<  d_p << ", u_p=" << u_p; 
-    cout << ", s_p=" << s_p << ", c_p=" << c_p << endl;
-
-    // Get coupling constants
-    double C_1d = 1/2. - 2 * SIN2_TH / 3;
-    double C_1u = -1/2. + 4 * SIN2_TH / 3;
-    double C_2d = 1/2. - 2 * SIN2_TH;
-    double C_2u = -1/2. + 2 * SIN2_TH;
-    cout << "SIN2_TH=" <<  SIN2_TH << ", C_1d=" << C_1d;
-    cout << ", C_1u=" << C_1u << ", C_2d=" << C_2d << ", C_2u=";
-    cout << C_2u << endl;
-
-    Gy[i] = GQ2[i] / (2 * MP * Gx[i] * beamE);  // inelasticity
-    double Y = (1 - (1-Gy[i]) * (1-Gy[i])) / (1 + (1-Gy[i]) * (1-Gy[i]));
-    cout << "Gy[i]=" <<  Gy[i] << ", Y=" << Y << endl;
+    //.//cout << "d_p=" <<  d_p << ", u_p=" << u_p; 
+    //.//cout << ", s_p=" << s_p << ", c_p=" << c_p << endl;
+    
+    Gy[i] = GQ2[i] / (2 * MP * Gx[i] * beamE);  // Inelasticity
+    GY[i] = (1 - (1-Gy[i]) * (1-Gy[i])) / (1 + (1-Gy[i]) * (1-Gy[i]));
+    //.//cout << "Gy[i]=" <<  Gy[i] << ", GY[i]=" << GY[i] << endl;
       
     // Create theoretical A_{RL,p}^{e^{-},PVDIS}
-    double A_const = BEAM_POLARIZ * 3 * sqrt(2) * GF * GQ2[i] / 
+    GA_const[i] = BEAM_POLARIZ * 3 * sqrt(2) * GF * GQ2[i] / 
       (4 * M_PI * ALPHA);  // Proportionality constant for A
     // Top left part of A's equation
     double A_tleft = 2 * (u_p + c_p) * C_1u - (d_p + s_p) * C_1d;
     // Top right part of A's equation
-    double A_tright = Y * (2 * (u_V + c_V) * C_2u - (d_V + s_V) * C_2d);
+    double A_tright = GY[i] * (2 * (u_V + c_V) * C_2u - (d_V + s_V) * C_2d);
     // Divisor of A's equation
     double A_div = 4 * (u_p + c_p) + (d_p + s_p); 
-    cout << "A_const=" <<  A_const << ", A_tleft=" << A_tleft;
+    cout << "GA_const=[i]" << GA_const[i] << ", A_tleft=" << A_tleft;
     cout << ", A_tright=" << A_tright << ", A_div=" << A_div << endl;
-    GApv[i] = A_const * (A_tleft + A_tright) / A_div;  // A_theory
+    GApv[i] = GA_const[i] * (A_tleft + A_tright) / A_div;  // A_theory
     cout << "GApv=" << GApv[i] << ", GQ2[i]=" << GQ2[i];
     cout << ", Gx[i]=" << Gx[i] << endl << endl;
 
@@ -218,8 +242,8 @@ void calcAsym(string fileName, string pdfName, double beamE) {
 
     // Total uncorrelated uncertainty
     Gda[i] = sqrt(dA_stat*dA_stat + dA_sys_uncor*dA_sys_uncor);
-    cout << "dA_stat=" << dA_stat << ", dA_sys_uncor=" << dA_sys_uncor << endl;
-    cout << "Gda[i]=" << Gda[i] << ", dA_sys_cor=" << dA_sys_cor << endl;
+    //.//cout << "dA_stat=" << dA_stat << ", dA_sys_uncor=" << dA_sys_uncor << endl;
+    //.//cout << "Gda[i]=" << Gda[i] << ", dA_sys_cor=" << dA_sys_cor << endl;
       
     // Create the psuedodata that has noise
     Ga_rand[i] = GApv[i] + random->Gaus()*Gda[i] + r_prime*dA_sys_cor;
@@ -227,13 +251,14 @@ void calcAsym(string fileName, string pdfName, double beamE) {
     // d/u stuff
 
     // Calculate d/u using pseudodata that has noise
-    Double_t du_numerator = -4*Ga_rand[i] + 2*C_1u*A_const + 2*C_2u*Y*A_const;
-    Double_t du_denominator = Ga_rand[i] + C_1d*A_const + C_2d*Y*A_const;
+    Double_t du_numerator = -4*Ga_rand[i] + 2*C_1u*GA_const[i] + 
+      2*C_2u*GY[i]*GA_const[i];
+    Double_t du_denominator = Ga_rand[i] + C_1d*GA_const[i] + C_2d*GY[i]*GA_const[i];
     cout << "d/u rand: " << du_numerator/du_denominator << endl;
 
     // Calculate d/u using psuedodata that has no noise
-    du_numerator = -4*GApv[i] + 2*C_1u*A_const + 2*C_2u*Y*A_const;
-    du_denominator = GApv[i] + C_1d*A_const + C_2d*Y*A_const;
+    du_numerator = -4*GApv[i] + 2*C_1u*GA_const[i] + 2*C_2u*GY[i]*GA_const[i];
+    du_denominator = GApv[i] + C_1d*GA_const[i] + C_2d*GY[i]*GA_const[i];
     cout << "d/u theory: " << du_numerator/du_denominator << endl;
 
     // Calculate the precise d/u value
@@ -242,25 +267,45 @@ void calcAsym(string fileName, string pdfName, double beamE) {
     // d/u error stuff
 
     // Error in d/u due to statistical uncertainty in A
-    Double_t du_A_err = abs(Gda[i] * (-2)*A_const * 
-			    (2*C_1d + C_1u + (2*C_2d + C_2u)*Y) / 
-			    pow((GApv[i] + C_1d*A_const + C_2d*Y*A_const), 2));
-    cout << "du_A_err=" << du_A_err;
+    du_A_err[i] = 
+      abs(Gda[i] * (-2)*GA_const[i] * (2*C_1d + C_1u + (2*C_2d + C_2u)*GY[i]) / 
+	  pow((GApv[i] + C_1d*GA_const[i] + C_2d*GY[i]*GA_const[i]), 2));
+    //.//cout << "du_A_err[i]=" << du_A_err[i];
 
-    // Errpr in d/u due to uncertainty in SIN2_TH
-    Double_t du_sin2th_err = 
-      abs(0.0006 * 24*A_const * (A_const - 6*GApv[i]*Y + A_const*Y) / 
-	  pow(6*GApv[i] + 3*A_const*(1+Y) - 4*A_const*SIN2_TH*(1+3*Y), 2));
-    cout << ", du_sin2th_err=" << du_sin2th_err << endl;
+    // Error in d/u due to uncertainty in SIN2_TH
+    du_sin2th_err[i] = abs(0.0006 * 24*GA_const[i] * 
+			   (GA_const[i] - 6*GApv[i]*GY[i] + GA_const[i]*GY[i]) / 
+			   pow(6*GApv[i] + 3*GA_const[i]*(1+GY[i]) - 
+			       4*GA_const[i]*SIN2_TH*(1+3*GY[i]), 2));
+    //.//cout << ", du_sin2th_err[i]=" << du_sin2th_err[i] << endl;
 
     i++;
     counter++;
   }
+
+  
+
+  /*// Error in d/u due to statistical uncertainty in A
+  for (int i = 0; i < counter; i++) {
+    Double_t du_A_err = abs(Gda[i] * (-2)*GA_const[i] *
+                            (2*C_1d + C_1u + (2*C_2d + C_2u)*GY[i]) /
+                            pow((GApv[i] + C_1d*GA_const[i] + C_2d*GY[i]*GA_const[i]), 2));
+    cout << "du_A_err=" << du_A_err;
+
+    // Error in d/u due to uncertainty in SIN2_TH
+    Double_t du_sin2th_err =
+      abs(0.0006 * 24*GA_const[i] * (GA_const[i] - 6*GApv[i]*GY[i] + GA_const[i]*GY[i]) /
+          pow(6*GApv[i] + 3*GA_const[i]*(1+GY[i]) - 4*GA_const[i]*SIN2_TH*(1+3*GY[i]), 2)\
+	  );
+    cout << ", du_sin2th_err=" << du_sin2th_err << endl;
+  }  
+  */
+
   cout << "AFTER WHILE LOOP "<< endl;
   cout << "_______________________________________" << endl;
 
   NBINS = counter;
-  cout << "NBINS: " << NBINS;
+  //.//cout << "NBINS: " << NBINS;
 
   // Clean up
   delete pdf;
@@ -283,7 +328,7 @@ double func(Double_t x, Double_t q2, Double_t y, Double_t u, Double_t ubar, Doub
   //Double_t cplus = c + cbar;
   //Double_t splus = s + sbar;
 
-  double Y = (1 - (1-Gy[i]) *  (1-Gy[i])) / (1 +  (1-Gy[i]) *  (1-Gy[i]));
+  //double Y = (1 - (1-Gy[i]) *  (1-Gy[i])) / (1 +  (1-Gy[i]) *  (1-Gy[i]));
   
   // Coupling constants
   double C_1d = 1/2. - 2 * SIN2_TH / 3;
@@ -294,7 +339,7 @@ double func(Double_t x, Double_t q2, Double_t y, Double_t u, Double_t ubar, Doub
   // Calculate A assuming ubar=dbar=sbar=cbar=s=c=0
   double A_const = BEAM_POLARIZ * 3 * sqrt(2) * GF * GQ2[i] / (4 * M_PI * ALPHA);
   Double_t A_numerator = A_const * 
-    (2.0*C_1u + 2.0*Y*C_2u - par[0]*(C_1d + Y*C_2d));
+    (2.0*C_1u + 2.0*GY[i]*C_2u - par[0]*(C_1d + GY[i]*C_2d));
   Double_t A_denominator = par[0] + 4;
 
   return (A_numerator/A_denominator); //return type needs to be of the form of double
@@ -305,15 +350,19 @@ void fcn(Int_t &npar, Double_t *gin, Double_t &f, Double_t *par, Int_t iflag) {
 
   // Create and fill error matrix
   //Asym_Values Calculation;
+  counter = stop_i - start_i;  // . ADDED THIS LINE
+  //cout << "counter=" << counter << ", stop_i=" << stop_i;
+  //cout << "start_i=" << stop_i << endl;
   TMatrixT<double> Err_matrix(counter, counter);
   TMatrixT<double> Stat_Err_matrix(counter, counter);
   for (int i=0; i<counter; i++) {
     for (int j=0; j<counter; j++) {
       if (i==j) {
 	//Stat_Err_matrix(i,j)=pow(Error_1[i],2);
-	Stat_Err_matrix(i,j)= (pow(Error_1[i],2)
-			       + pow(Error_Sys[i],2) + pow(Error_corr[i],2));
-	//Stat_Err_matrix(i,j)= (pow(Error_1[i],2)  + pow(Error_Sys[i],2));      
+	Stat_Err_matrix(i,j)= (pow(Error_1[i+start_i],2)
+			       + pow(Error_Sys[i+start_i],2) + pow(Error_corr[i+start_i],2));
+	//Stat_Err_matrix(i,j)= (pow(Error_1[i],2)  + pow(Error_Sys[i],2));
+	//cout << i << " " << j;
       }
       else{	 	 	
 	Stat_Err_matrix(i,j) = 0.0;  // . might be dA_sys_cor^2
@@ -335,12 +384,13 @@ void fcn(Int_t &npar, Double_t *gin, Double_t &f, Double_t *par, Int_t iflag) {
   Double_t delta;
   //Double_t Pseduo=0.0;
   //TRandom *random_2 = new TRandom();
-  for(int i = 0; i < NBINS; ++i) {
+  for(int i = start_i; i < stop_i; ++i) { // . Replaced 0 w/ start_i and NBINS w/ stop_i
     GcalcA[i] = func(Gx[i], GQ2[i], Gy[i], Gu[i], Gubar[i], Gd[i], Gdbar[i], Gs[i], Gsbar[i], Gc[i], Gcbar[i], par, i);  // . added the i
     //Calculation=func(Gx[i],GQ2[i],Gy[i],Gu[i],Gubar[i],Gd[i],Gdbar[i],Gs[i],Gsbar[i],Gc[i],Gcbar[i],par);  
     //GcalcA[i]=Calculation.Fit_Val;
     //Pseduo= Calculation.Fixed_Val + random_2->Gaus()*Gda[i] + r_prime*(sqrt(pow(0.01*Calculation.Fit_Val*1,2)));
-    
+   
+    //cout << "" << GcalcA[i] << "Gx[i]=" << Gx[i] << ", GQ2[i]" << GQ2[i] << " par" << par[0] << endl;//  << ", " << Gx[i] << ", " <<  GQ2[i] << ", " <<  Gy[i] << ", " <<  Gu[i] << ", " <<  Gubar[i] << ", " <<  Gd[i] << ", " <<  Gdbar[i] << ", " <<  Gs[i] << ", " <<  Gsbar[i] << ", " <<  Gc[i] << ", " <<  Gcbar[i] << ", " << i << endl;
     //cout << Ga_rand[i] << ", " << GcalcA[i] << ", " << Gda[i] << "A terms" <<endl;
     delta = (Ga_rand[i] - GcalcA[i]);///Gda[i];
     //delta = (Pseduo-GcalcA[i])/Gda[i]; 
@@ -348,7 +398,7 @@ void fcn(Int_t &npar, Double_t *gin, Double_t &f, Double_t *par, Int_t iflag) {
     //Diff(0,i) = (abs(Ggoodness[i] - 1.0000) < 0.1)*pow((Ga_rand[i]-GcalcA[i]),1);
     //Diff(0,i) = (abs(Ggoodness[i] - 1.0000) < 0.1)*pow((Pseduo-GcalcA[i]),1); 
     // Diff(0,i) =pow((Pseduo-GcalcA[i]),1);
-    Diff(0,i) = delta;//*delta;
+    Diff(0,i-start_i) = delta;//*delta;
     //cout << "delta " << delta;
     //cout << " Diff" << Diff(0,i) << endl;
   }
@@ -387,7 +437,9 @@ void fcn(Int_t &npar, Double_t *gin, Double_t &f, Double_t *par, Int_t iflag) {
 int main(Int_t argc, char *argv[]) {
 
   if(argc < 1) {
-    cout << "Please call with appropriate arguments:" << endl << "./codeName beamType luminosity withUnfolding(true/false) inputFile" << endl;
+    cout << "Please call with appropriate arguments:" << endl;
+    cout << "./codeName beamType luminosity withUnfolding(true/false) inputFile";
+    cout << endl;
     return -1;
   }
   
@@ -399,89 +451,171 @@ int main(Int_t argc, char *argv[]) {
   //string pdfName = "MMHT2014nlo68cl";
   cout << endl << "Simulation File Parameters:" << endl;
   cout << "File name: " << fileName << endl;
-  //cout << "Beam luminosity: " << luminosity << endl;
-  cout << "Without unfolding" << endl;
-  cout << "Polarization: 80%" << endl << endl;
+  cout << "Without unfolding" << endl;   // . What does this mean?
+  cout << "Polarization: " << BEAM_POLARIZ << "%" << endl << endl;
   
   //calcAsym(fileName, pdfName, flagUnfolding, luminosity,beamTypeStr,Ordered_values);
   calcAsym(fileName, pdfName, beamE);   
+  int i = 0;// . added the below loop and if statement and stop_i
+  cout << "Gx[i]" << Gx[i]; 
+  while (Gx[i] > 0) {
+    cout << endl << "Gx[i]=" << Gx[i] << ", i=" << i << ", Gx[i+1]=" << Gx[i+1];
 
-  // Instantiate Minuit for 1 parameter
-  TMinuit *gMinuit = new TMinuit(1);//4); 
-  gMinuit->SetFCN(fcn);  // Set the address of the function to be minimized
+    if (Gx[i] != Gx[i+1]) {
+      stop_i = i + 1;
+      cout << "stop_i=" << stop_i << ", start_i=" << start_i;
+       
+      // Instantiate Minuit for 1 parameter
+      TMinuit *gMinuit = new TMinuit(1);//4); 
+      gMinuit->SetFCN(fcn);  // Set the address of the function to be minimized
+      
+      //Perform fit with betas fixed
+      //--------------------------------------------------------------------
+      //cout << endl << "Betas fixed" << endl;
+      Double_t arglist[10];
+      Int_t ierflg = 0;
+      
+      // . I commented out the next two lines because https://llr.in2p3.fr/activites/physique/glast/workbook/pages/advanced_GRUG/GRUGminuit.pdf  doesn't have them and I can't find a good explanation of what they do
+      arglist[0] = 1;  // 1 because we want a chisquare fit
+      gMinuit->mnexcm("SET ERR", arglist, 1, ierflg);
+      
+      static Double_t vstart[1] = {0.01};
+      static Double_t step[1] = {0.001};
+      // Set information for the parameter (like bounds)
+      gMinuit->mnparm(0, "d/u", vstart[0], step[0], 0, 1, ierflg); // or 0, 0 to have no bounds
+      
+      // . I Commented out the next four lines because they seem like they don't need to be fixed, but I only kind of understand what is going on. I uncommented the 500 lines since it's in https://llr.in2p3.fr/activites/physique/glast/workbook/pages/advanced_GRUG/GRUGminuit.pdf
+      arglist[0] = 500; // Max calls
+      arglist[1] = .001;  // Tolerance  (was 1)
+      //gMinuit->FixParameter(1);
+      
+      //gMinuit->SetPrintLevel(1);
+      //double tmp_sin=0.0;
+      //double tmp_error=0.0;
+      //gMinuit -> GetParameter(0,tmp_sin,tmp_error);
+      //cout<<"tmp_sin"<<","<<tmp_sin<<","<<tmp_error<<endl;
+      // arglist is a list of arguments that MIGRAD takes. 2 means that it takes two arguments from arglist (I think based on https://root-forum.cern.ch/t/understanding-minuit/34836/5 )
+      // Minimize the function
+      gMinuit->mnexcm("MIGRAD", arglist, 2, ierflg);
+      //gMinuit->mnexcm("SCAN", arglist, 0, ierflg);   
+      //cout<<"tmp_sin"<<","<<tmp_sin<<","<<tmp_error<<endl;
+      //--------------------------------------------------------------------
+      
+      // Print results
+      /*
+	Double_t amin,edm,errdef;
+	Int_t nvpar,nparx,icstat;
+	gMinuit->mnstat(amin,edm,errdef,nvpar,nparx,icstat);
+	//gMinuit->mnprin(3,amin);*/
+      
+      /*
+	for(int i = 0; i < NBINS; ++i)
+	cout << GApv[i] << "   " << GcalcA[i] << endl;
+      */
+      double du_out, err;
+      gMinuit -> GetParameter(0, du_out, err);
+      Outfile << du_out << "," << err << endl;
+      du_fitted[0].push_back(du_out);
+      du_f_err[0].push_back(err);
+      du_x[0].push_back(Gx[i]);
+      /*double  Output_Sinsq[sinq2_val[0].size()];
+	double Output_chi_square[chi_square[0].size()];
+      */
+      //std::vector<double> Output_Sinsq;
+      
+      delete gMinuit;
+      //cout<<"SIZE"<<sinq2_val[0].size()<<endl;
+      
+      /*// . COMMENTED OUT THE BELOW B/C DON" 
+      for (auto it = sinq2_val[lum_sets].begin();
+	   it != sinq2_val[lum_sets].end(); it++) {
+	//cout << *it <<endl;
+	//Output_Sinsq.push_back(*it);
+	Outfile_Sinsq<<lum_sets<<"," <<*it<<endl;
+      }  
+      
+      /*for (int k=0;k<Output_Sinsq.size();k++){
+	cout<<"Output_Sinsq"<<","<<Output_Sinsq[k]<<endl;
+	Outfile_Sinsq<<Output_Sinsq[k]<<endl;
+	}*/
+      /*
+      for (auto ip = chi_square[lum_sets].begin();
+	   ip != chi_square[lum_sets].end(); ip++) {
+	//cout<< *ip << endl;
+	Outfile_chi<<lum_sets<<","<<std::setprecision(9)<<*ip<<endl;
+	} */
+    }
+    i++;  // . Added this
+    cout << "start_i=" << start_i << ", stop_i=" << stop_i;
+    start_i = stop_i;  // . Added this
+  }
+  //cout << du_x[0] << ", " <<  du_fitted[0] << ", "  << du_f_err[0] << endl;
+  //du_x[0].print;//(du_x);
   
-  //Perform fit with betas fixed
-  //--------------------------------------------------------------------
-  cout << endl << "Betas fixed" << endl;
-  Double_t arglist[10];
-  Int_t ierflg = 0;
-
-  // . I commented out the next two lines because https://llr.in2p3.fr/activites/physique/glast/workbook/pages/advanced_GRUG/GRUGminuit.pdf  doesn't have them and I can't find a good explanation of what they do
-  arglist[0] = 1;  // 1 because chisquare fit
-  gMinuit->mnexcm("SET ERR", arglist, 1, ierflg);
-
-  static Double_t vstart[1] = {0.0};//0.1,0,0,0}; here and right below was 4, not 1, and here had 0.1, not 0.0
-  static Double_t step[1] = {0.001};//,0.001,0.001,0.001};
-  // Set information for the parameter (like bounds) https://root.cern.ch/doc/master/classTMinuit.html#afe6f9a91a4c16f4bd024a5c2b7648252
-  gMinuit->mnparm(0, "d/u", vstart[0], step[0], 0, 1, ierflg); // or 0, 0 to have no bounds
+  cout << endl <<endl << du_x[0].size() << endl;
+  for(int i=0; i < du_x[0].size(); i++) {
+    std::cout << " (du_x[0])[i]=" << (du_x[0])[i];
+    std::cout << " (du_fitted[0])[i]=" << (du_fitted[0])[i];
+    std::cout << " (du_f_err[0])[i]=" << (du_f_err[0])[i] << endl;
+  }
+  cout <<endl << endl;
   
-  // . I Commented out the next four lines because they seem like they don't need to be fixed, but I only kind of understand what is going on. I uncommented the 500 lines since it's in https://llr.in2p3.fr/activites/physique/glast/workbook/pages/advanced_GRUG/GRUGminuit.pdf
-  arglist[0] = 500; // Max calls
-  arglist[1] = .001;  // Tolerance  (was 1)
-  //gMinuit->FixParameter(1);
+  //  double* a = &[0];
+  int length = du_x[0].size();
+  double du_x_a[du_x[0].size()];
+  std::copy((du_x[0]).begin(), (du_x[0]).end(), du_x_a);
+  double du_f_a[(du_fitted[0]).size()];
+  std::copy((du_fitted[0]).begin(), (du_fitted[0]).end(), du_f_a);
+  double du_f_err_a[(du_f_err[0]).size()];
+  std::copy((du_f_err[0]).begin(), (du_fitted[0]).end(), du_f_err_a);
+  //double du_x_err_a[(du_x[0]).size()] = {0};
+  double du_x_err_a[length];
+  memset(du_x_err_a, 0, length*sizeof(int));
 
-  //gMinuit->SetPrintLevel(1);
-  //double tmp_sin=0.0;
-  //double tmp_error=0.0;
-  //gMinuit -> GetParameter(0,tmp_sin,tmp_error);
-  //cout<<"tmp_sin"<<","<<tmp_sin<<","<<tmp_error<<endl;
-  // arglist is a list of arguments that MIGRAD takes. 2 means that it takes two arguments from arglist (I think based on https://root-forum.cern.ch/t/understanding-minuit/34836/5 )
-  // Minimize the function
-  gMinuit->mnexcm("MIGRAD", arglist, 2, ierflg);
-  //gMinuit->mnexcm("SCAN", arglist, 0, ierflg);   
-  //cout<<"tmp_sin"<<","<<tmp_sin<<","<<tmp_error<<endl;
-  //--------------------------------------------------------------------
-
-  // Print results
-  /*
-   Double_t amin,edm,errdef;
-   Int_t nvpar,nparx,icstat;
-   gMinuit->mnstat(amin,edm,errdef,nvpar,nparx,icstat);
-  //gMinuit->mnprin(3,amin);*/
-   
-  /*
-   for(int i = 0; i < NBINS; ++i)
-     cout << GApv[i] << "   " << GcalcA[i] << endl;
-  */
-  double sin2_out,err;
-  gMinuit -> GetParameter(0,sin2_out,err);
-  Outfile<<sin2_out<<","<<err<<endl;
-  
-  /*double  Output_Sinsq[sinq2_val[0].size()];
-    double Output_chi_square[chi_square[0].size()];
-  */
-  //std::vector<double> Output_Sinsq;
-  
-  delete gMinuit;
-  //cout<<"SIZE"<<sinq2_val[0].size()<<endl;
-   
-  for (auto it = sinq2_val[lum_sets].begin();
-       it != sinq2_val[lum_sets].end(); it++) {
-    //cout << *it <<endl;
-    //Output_Sinsq.push_back(*it);
-    Outfile_Sinsq<<lum_sets<<"," <<*it<<endl;
-  }  
-
-  /*for (int k=0;k<Output_Sinsq.size();k++){
-    cout<<"Output_Sinsq"<<","<<Output_Sinsq[k]<<endl;
-    Outfile_Sinsq<<Output_Sinsq[k]<<endl;
-  }*/
-
-  for (auto ip = chi_square[lum_sets].begin();
-       ip != chi_square[lum_sets].end(); ip++) {
-    //cout<< *ip << endl;
-    Outfile_chi<<lum_sets<<","<<std::setprecision(9)<<*ip<<endl;
+  cout << endl <<endl << du_x[0].size() << endl;
+  for(int i=0; i < du_x[0].size(); i++) {
+    std::cout << " (du_x_a)[i]=" << (du_x_a)[i];
+    std::cout << " (du_f_a)[i]=" << (du_f_a)[i];
+    std::cout << " (du_f_err[0])[i]=" << (du_f_err_a)[i];
+    std::cout << " (du_x_err[0])[i]=" << (du_x_err_a)[i] << endl;
   }
 
+  //TCanvas *c_imr = new TCanvas("c_imr","A Simple Graph Example",200,10,700,500);
+  /*
+  const Int_t n = 20;
+  double x[n], y[n];
+  for (Int_t i=0;i<n;i++) {
+    x[i] = i*0.1;
+    y[i] = 110*sin(x[i]+0.2);
+    printf(" i %i %f %f \n",i,x[i],y[i]);
+  }*/
+  auto gr = new TGraphErrors((du_x[0]).size(), du_x_a, du_f_a, du_x_err_a, du_f_err_a);
+
+  auto lineplot = new TGraph((du_x[0]).size(), du_x_a, du_f_a);
+		       //,(du_x[0]), (du_fitted[0]));//n,x,y);
+  TCanvas* c1 = new TCanvas("c1", "c1", 800, 600);
+
+  //gr->SetFillColor(2);
+  gr->SetFillColorAlpha(2, 0.35);
+  gr->GetXaxis()->SetTitle("x");
+  gr->GetYaxis()->SetTitle("d/u");
+  gr->SetTitle("");
+  gr->Draw("a3");//AC*");//"ACP");
+  lineplot->SetMarkerStyle(7);
+  lineplot->SetMarkerColorAlpha(2, 0.35);
+  lineplot->SetLineColor(2);
+  lineplot->SetTitle("CT18NLO");//"Fitted d/u values");
+  lineplot->Draw("same PL");
+  //gPad->BuildLegend();
+  auto legend = new TLegend(.1, .1, .3, .3, "legend");//.1,.7,.3,.9,"Lab. Lesson 1");
+  legend->AddEntry(lineplot,"CT18NLO","PL");
+  //legend->AddEntry(f,"Th. Law","L");
+  legend->Draw("same");
+  c1->Update();
+  c1->SaveAs("file_name.png");
+  //cout << "Did you get a plot? ";
+  //std::cin.get();
+  
+  
   return 0;
 }
