@@ -79,9 +79,7 @@ Double_t GA_const[MAXBINS];  // . added this
 Int_t start_i = 0;  // . added Values for when to start the next x
 Int_t stop_i = 0;
 
-// . Added below 5 lines
-Double_t du_A_err[MAXBINS];  // Error in d/u due to A
-Double_t du_sin2th_err[MAXBINS];  // Error in d.u due to sin^2(theta)
+// . Added below 3 lines
 std::vector<std::vector<double>> du_fitted(sizeof(PDF_names), vector<double>(0));
 std::vector<std::vector<double>> du_f_err(sizeof(PDF_names), vector<double>(0));
 std::vector<std::vector<double>> du_x(sizeof(PDF_names), vector<double>(0));
@@ -99,6 +97,10 @@ int counter = 0; // How many entries
 ofstream Outfile;
 int error_type;
 int lum_sets=0;
+
+ofstream all_bins;
+ofstream x_cols;
+ofstream fits;
 
 void calcAsym(string fileName, string pdfName, double beamE) {
   cout << "PDFNAME=" << pdfName << endl;
@@ -128,15 +130,18 @@ void calcAsym(string fileName, string pdfName, double beamE) {
   int num = 0;  // Number of bins for a given value of x
   double xsum = 0;  // x
   double Q2sum = 0;  // Q2
-  double dusumR = 0;  // d/u calculated using noisy pseodo-data
-  double dusumT = 0;  // d/u calculated using psuedo-data (no noise) 
-  double dusumE = 0;  // d/u calculated using quark rates directly from PDFs
+  double duSum_noisy = 0;  // d/u calculated using noisy pseodo-data
+  double duSum_clean = 0;  // d/u calculated using psuedo-data (no noise) 
+  double duSum_exact = 0;  // d/u calculated using quark rates directly from PDFs
+
   double weights = 0;
+  double dduSum_A_sys_uncor = 0;
+  double dduSum_sin2th = 0;
 
-  double dusum_ucn = 0;
-  double dusum_cs = 0;
+  double duSum_ucn = 0;
+  double duSum_cs = 0;
 
-  double dusum_sim = 0;
+  double duSum_sim = 0;
 
   // Read data from input file and use it (along with pdfs) to create pseudo-data
   string file_line;
@@ -161,32 +166,38 @@ void calcAsym(string fileName, string pdfName, double beamE) {
     // If just finished a value of x and are moving onto a new x,
     if (Gx[i] != Gx[i-1]) {
       // Print out the average values for this x
-      cout << "x: " << xsum / num << ", Q2: " << Q2sum / num;
-      cout << ", duSum_err: " << 1 / sqrt(weights) << endl;
-      cout << "dusumR: " << dusumR / weights << ", dusumT: " << dusumT / weights;
-      cout << ", dusumE: " << dusumE / weights << endl;
+      cout << "x: " << xsum / num << endl;// ", Q2: " << Q2sum / num << endl;
+      cout << "Combined noisy d/u: " << duSum_noisy / weights << endl;
+      cout << "Combined clean d/u: " << duSum_clean / weights << endl;
+      cout << "Combined exact d/u: " << duSum_exact / weights << endl;
 
-      cout << "dusumR/w - dusum_cs/w: ";
-      //      cout << dusum_ucn / weights - dusum_cs / weights << endl;
-      cout << dusumR / weights - dusum_cs / weights << endl;
+      cout << "Combined d/u statistical uncertainty: ";
+      cout << 1 / sqrt(weights) << endl;
+      cout << "Combined d/u A_sys_uncor uncertainty: "; 
+      cout << dduSum_A_sys_uncor / weights << endl;
+      cout << "Combined d/u sin2(theta_w) uncertainty: ";
+      cout << dduSum_sin2th / weights << endl;
 
-      cout << "dusum_sim/w - dusumT/w: ";
-      cout << dusum_sim / weights - dusumT / weights << endl;
+      cout << "Noisy d/u - SysCorShifted d/u: ";
+      cout << duSum_noisy / weights - duSum_cs / weights << endl;
+
+      cout << "Simplified_A d/u - clean_A d/u: ";
+      cout << duSum_sim / weights - duSum_clean / weights << endl;
 
       cout << "_____________________________________" << endl;
       // Reset sums to zero for the next x value
       xsum = 0;
       Q2sum = 0;
       num = 0;
-      dusumR = 0;
-      dusumT = 0;
-      dusumE = 0;
+      duSum_noisy = 0;
+      duSum_clean = 0;
+      duSum_exact = 0;
       weights = 0;
 
-      dusum_ucn =0;
-      dusum_cs = 0;
+      duSum_ucn =0;
+      duSum_cs = 0;
 
-      dusum_sim = 0;
+      duSum_sim = 0;
     }
     
     // Obtain quark rates
@@ -208,13 +219,10 @@ void calcAsym(string fileName, string pdfName, double beamE) {
     double u_V = Gu[i] - Gubar[i];
     double s_V = Gs[i] - Gsbar[i];
     double c_V = Gc[i] - Gcbar[i];
-    //cout << "d_p=" <<  d_p << ", u_p=" << u_p; 
-    //cout << ", s_p=" << s_p << ", c_p=" << c_p << endl;
     
     // Obtain y and Y
     Gy[i] = GQ2[i] / (2 * MP * Gx[i] * beamE);  // Inelasticity
     GY[i] = (1 - (1-Gy[i]) * (1-Gy[i])) / (1 + (1-Gy[i]) * (1-Gy[i]));
-    //cout << "Gy[i]=" <<  Gy[i] << ", GY[i]=" << GY[i] << endl;
       
     // Create theoretical A_{RL,p}^{e^{-},PVDIS}
     GA_const[i] = BEAM_POLARIZ * 3 * sqrt(2) * GF * GQ2[i] / 
@@ -225,11 +233,7 @@ void calcAsym(string fileName, string pdfName, double beamE) {
     double A_tright = GY[i] * (2 * (u_V + c_V) * C_2u - (d_V + s_V) * C_2d);
     // Divisor of A's equation
     double A_div = 4 * (u_p + c_p) + (d_p + s_p); 
-    //cout << "GA_const=[i]" << GA_const[i] << ", A_tleft=" << A_tleft;
-    //cout << ", A_tright=" << A_tright << ", A_div=" << A_div << endl;
     GA_clean[i] = GA_const[i] * (A_tleft + A_tright) / A_div;  // A_theory
-    //cout << "GA_clean=" << GA_clean[i] << ", GQ2[i]=" << GQ2[i];
-    //cout << ", Gx[i]=" << Gx[i] << endl << endl;
 
     // Calculate uncertainties
 
@@ -238,49 +242,41 @@ void calcAsym(string fileName, string pdfName, double beamE) {
     // Uncorrelated systematic uncertainty: 
     //   radiative corrections = 0.2%; event reconstruction = 0.2%
     dA_sys_uncor[i] = abs(GA_clean[i]) * sqrt(0.002*0.002 + 0.002*0.002);
-
     // Correlated systematic uncertainty: polarimetry = 0.4%, Q2 = 0.2%
     dA_sys_cor[i] = abs(GA_clean[i]) * sqrt(0.004*0.004 + 0.002*0.002); 
-
     // Total uncorrelated uncertainty
-    GdA_t_uncor[i] = sqrt(dA_stat[i]*dA_stat[i] + dA_sys_uncor[i]*dA_sys_uncor[i]);
-    //cout << "dA_stat=" << dA_stat << ", dA_sys_uncor=" << dA_sys_uncor << endl;
-    //cout << "GdA_t_uncor[i]=" << GdA_t_uncor[i] << ", dA_sys_cor=" << dA_sys_cor << endl;
-      
+    GdA_t_uncor[i] = sqrt(dA_stat[i]*dA_stat[i] + 
+			  dA_sys_uncor[i]*dA_sys_uncor[i]);
     // Create the psuedo-data that has noise based on uncertainty
     GA_noisy[i] = GA_clean[i] + random->Gaus()*GdA_t_uncor[i] + r_prime*dA_sys_cor[i];
 
+
     // d/u error stuff
-
-    // Error in d/u due to statistical uncertainty in A  // . change to du_A_stat
-    /*du_A_err[i] =
-      abs(GdA_t_uncor[i] * (-2)*GA_const[i] * (2*C_1d + C_1u + (2*C_2d + C_2u)*GY[i]) /
-          pow((GA_clean[i] + C_1d*GA_const[i] + C_2d*GY[i]*GA_const[i]), 2));
-    */
-    double du_A_stat = abs(dA_stat[i]) * 
+    //cout << "x=" << Gx[i] << ", 
+    cout << "Q2=" << GQ2[i];
+    // Error in d/u due to statistical uncertainty in A 
+    double ddu_A_stat = abs(dA_stat[i]) * 
       ((-2)*GA_const[i] * (2*C_1d + C_1u + (2*C_2d + C_2u)*GY[i]) /
        pow((GA_clean[i] + C_1d*GA_const[i] + C_2d*GY[i]*GA_const[i]), 2));
-    // . maybe change to not GA_clean
-    double du_A_sys_uncor = abs(dA_sys_uncor[i]) * 
+    cout << ", ddu_A_stat=" << ddu_A_stat;
+    double weight = 1 / (ddu_A_stat*ddu_A_stat);
+    weights += weight;
+
+    // Error in d/u due to uncorrelated systematic uncertainty in A
+    double ddu_A_sys_uncor = abs(dA_sys_uncor[i]) * 
       ((-2)*GA_const[i] * (2*C_1d + C_1u + (2*C_2d + C_2u)*GY[i]) /
        pow((GA_clean[i] + C_1d*GA_const[i] + C_2d*GY[i]*GA_const[i]), 2));
-    du_A_err[i] = sqrt(du_A_stat*du_A_stat + du_A_sys_uncor*du_A_sys_uncor);
-
-    //cout << "du_A_err[i]=" << du_A_err[i];
+    cout << ", ddu_A_sys_uncor=" << ddu_A_sys_uncor;
+    dduSum_A_sys_uncor += ddu_A_sys_uncor * weight;
 
     // Error in d/u due to uncertainty in SIN2_TH
-    du_sin2th_err[i] = abs(0.0006 * 24*GA_const[i] *
-                           (GA_const[i] - 6*GA_clean[i]*GY[i] + GA_const[i]*GY[i]) /
-                           pow(6*GA_clean[i] + 3*GA_const[i]*(1+GY[i]) -
-                               4*GA_const[i]*SIN2_TH*(1+3*GY[i]), 2));
-    //cout << ", du_sin2th_err[i]=" << du_sin2th_err[i] << endl;
-    //double du_err = 1/(du_A_err[i]*du_A_err[i] + du_sin2th_err[i]*du_sin2th_err[i]);
-    //weights += du_err;
-    //dusumE_err += du_A_err[i]*du_A_err[i] + du_sin2th_err[i]*du_sin2th_err[i];
-    double weight = 1 / 
-      //      (du_A_stat[i]*du_A_stat[i]);
-      (du_A_err[i]*du_A_err[i] + du_sin2th_err[i]*du_sin2th_err[i]);
-    weights += weight;
+    double ddu_sin2th = abs(0.0006 * 24*GA_const[i] * 
+		    (GA_const[i] - 6*GA_clean[i]*GY[i] + GA_const[i]*GY[i]) /
+                    pow(6*GA_clean[i] + 3*GA_const[i]*(1+GY[i]) -
+                        4*GA_const[i]*SIN2_TH*(1+3*GY[i]), 2));
+    cout << ", ddu_sin2th=" << ddu_sin2th << endl;
+    dduSum_sin2th += ddu_sin2th * weight;
+
 
     // d/u stuff
 
@@ -289,39 +285,30 @@ void calcAsym(string fileName, string pdfName, double beamE) {
       2*C_2u*GY[i]*GA_const[i];
     Double_t du_denominator = GA_noisy[i] + C_1d*GA_const[i] + C_2d*GY[i]*GA_const[i];
     //cout << "d/u rand: " << du_numerator/du_denominator << endl;
-    //dusumR += du_numerator/du_denominator;  //
-    dusumR += weight*du_numerator/du_denominator;
+    duSum_noisy += weight * du_numerator/du_denominator;
 
     // Calculate d/u using psuedo-data that has no noise
-    du_numerator = -4*GA_clean[i] + 2*C_1u*GA_const[i] + 2*C_2u*GY[i]*GA_const[i];
+    du_numerator = -4*GA_clean[i] + 2*C_1u*GA_const[i] 
+      + 2*C_2u*GY[i]*GA_const[i];
     du_denominator = GA_clean[i] + C_1d*GA_const[i] + C_2d*GY[i]*GA_const[i];
     //cout << "d/u theory: " << du_numerator/du_denominator << endl;
-    dusumT += weight*du_numerator/du_denominator;
+    duSum_clean += weight * du_numerator/du_denominator;
 
     // Calculate the precise d/u value
     //cout << "d/u: " << Gd[i]/Gu[i] << endl;
-    dusumE += weight*Gd[i]/Gu[i];
+    duSum_exact += weight * Gd[i]/Gu[i];
 
 
 
     // Correlated uncertainty stuff
-    
-    //    GA_uncor_noise[i] = GA_noisy[i] - r_prime*dA_sys_cor[i];
-    //    GA_cor_shift[i] = GA_uncor_noise[i] + dA_sys_cor[i];
+
+    // Shift the noisy data by 1 sigma of systematic correlated uncertainty
     GA_cor_shift[i] = GA_noisy[i] + dA_sys_cor[i];
-
-
-    // Calculate d/u using psuedo-data that has uncorrelated noise
-    //du_numerator = -4*GA_uncor_noise[i] + 2*C_1u*GA_const[i] + 2*C_2u*GY[i]*GA_const[i];
-    //du_denominator = GA_uncor_noise[i] + C_1d*GA_const[i] + C_2d*GY[i]*GA_const[i];
-    //cout << "d/u theory: " << du_numerator/du_denominator << endl;
-    //dusum_ucn += weight*du_numerator/du_denominator;
-
-    // Calculate d/u using psuedo-data that has uncro noise and is shifted by cor
-    du_numerator = -4*GA_cor_shift[i] + 2*C_1u*GA_const[i] + 2*C_2u*GY[i]*GA_const[i];
+    // Calculate d/u using the shifted pseudo-data
+    du_numerator = -4*GA_cor_shift[i] + 2*C_1u*GA_const[i] 
+      + 2*C_2u*GY[i]*GA_const[i];
     du_denominator = GA_cor_shift[i] + C_1d*GA_const[i] + C_2d*GY[i]*GA_const[i];
-    //cout << "d/u theory: " << du_numerator/du_denominator << endl;
-    dusum_cs += weight*du_numerator/du_denominator;
+    duSum_cs += weight * du_numerator/du_denominator;
 
 
 
@@ -338,33 +325,33 @@ void calcAsym(string fileName, string pdfName, double beamE) {
     du_numerator = -4*GA_clean_sim[i] + 2*C_1u*A_const + 2*C_2u*GY[i]*A_const;
     du_denominator = GA_clean_sim[i] + C_1d*A_const + C_2d*GY[i]*A_const;
     //cout << "d/u theory: " << du_numerator/du_denominator << endl;
-    dusum_sim += weight*du_numerator/du_denominator;
+    duSum_sim += weight * du_numerator/du_denominator;
 
 
 
     xsum += Gx[i];
     Q2sum += GQ2[i];
     num += 1;
-    //dusumE_err += du_A_err[i]*du_A_err[i] + du_sin2th_err[i]*du_sin2th_err[i]; 
 
     i++;
     counter++;
   }
+  /*
   // Print out the averaged values for the last x value
   cout << "x: " << xsum / num << ", Q2: " << Q2sum / num; // fix so not num but uses weights
   cout << ", duSum_err: " << 1 / sqrt(weights) << endl;
-  cout << "dusumR: " << dusumR / weights << ", dusumT: " << dusumT / weights;
-  cout << ", dusumE: " << dusumE / weights << endl;
+  cout << "dusum_noisy: " << dusum_noisy / weights << ", dusum_clean: " << dusum_clean / weights;
+  cout << ", dusum_exact: " << dusum_exact / weights << endl;
   
-  cout << "dusumR/w - dusum_cs/w: ";
+  cout << "dusum_noisy/w - dusum_cs/w: ";
   //      cout << dusum_ucn / weights - dusum_cs / weights << endl;
-  cout << dusumR / weights - dusum_cs / weights << endl;
+  cout << dusum_noisy / weights - dusum_cs / weights << endl;
+  
 
 
-
-  cout << "dusum_sim/w - dusumT/w: ";
-  cout << dusum_sim / weights - dusumT / weights << endl;
-
+  cout << "dusum_sim/w - dusum_clean/w: ";
+  cout << dusum_sim / weights - dusum_clean / weights << endl;
+*/
 
 
   cout << "AFTER WHILE LOOP "<< endl;
