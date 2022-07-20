@@ -26,18 +26,21 @@ const Double_t RUNTIME_DAYS = 90.0;  // Number of days the experiment runs
 const Double_t BEAM_POLARIZ  =0.85;  // Beam polarization
 const Double_t SIN2_TH = 0.235;  // Sin^2(theta_w), (theta_w = weak mixing angle)
 const string PDF_NAME = "CT18NLO";
+Double_t BEAM_E = 11;//11;
 const vector<string> PDF_names = {"CT18NLO", "CT18NLO"};//"PDF4LHC21_40"};  // Vector of  PDFs to analyze
 
-// Create a new type that can return two values
+// Create a new type that can return two values  // uod
 struct Asym_Values{
   double Fit_Val;
   double Fixed_Val;
 };
 double r_prime=0.0;
 
+// Constants
 const Double_t GF = 1.16637e-5;  // GeV^2, Fermi constant
 const Double_t ALPHA = 7.2973525e-3;  // Fine structure constant
 const Double_t MP = 0.93828;  // GeV/c^2 Mass of a proton
+
 const Int_t MAXBINS = 500;  // . changed to 2000 to work with the fine grid
 
 //NOTE: The arrays are declared with fixed size, larger than what is needed for any file, to avoid overly complicated dynamic memory allocation
@@ -104,7 +107,8 @@ ofstream fits_file;
 void calcAsym(string fileName, string pdfName, double beamE) {
   cout << "PDFNAME=" << pdfName << endl;
   
-  all_bins_file.open (PDF_NAME + "_Analytic_Values_for_All_Bins.csv");
+  all_bins_file.open (PDF_NAME + "_" + to_string(beamE) + 
+		      "GeV_PDFStuff_Analytic_Values_for_All_Bins.csv");
   all_bins_file << "x,Q2 (GeV^2),rate (Hz),A_clean,A_noisy,A_simplified,";
   all_bins_file << "dA_stat,dA_sys_uncor,dA_sys_cor,";
   all_bins_file << "d/u noisy,d/u clean,d/u PDF,d/u simplified,";
@@ -120,8 +124,9 @@ void calcAsym(string fileName, string pdfName, double beamE) {
   all_bins_file << "and4";
   all_bins_file.close();*/
 
-  x_cols_file.open (PDF_NAME + "_Analytic_Values_for_each_x.csv");
-  x_cols_file << "x,Q2 (GeV^2),rate (Hz)";
+  x_cols_file.open (PDF_NAME + "_" + to_string(beamE) +
+		    "GeV_PDFStuff_Analytic_Values_for_each_x.csv");
+  x_cols_file << "x,Q2 (GeV^2),rate (Hz),";
   x_cols_file << "d/u noisy,d/u clean,d/u PDF,d/u simplified,";
   x_cols_file << "d/u shifted by 1 sig sys cor,";
   x_cols_file << "d(d/u) from A_stat,d(d/u) from A_sys_uncor,";
@@ -557,7 +562,7 @@ int main(Int_t argc, char *argv[]) {
   //for (auto &pdfName: PDF_names) {
   //for (int Np = 0; Np < PDF_names.size(); ++Np) {
   //string pdfName = PDF_names[Np];
-  double beamE = 11; // GeV, beamline energy
+  double beamE = BEAM_E; // GeV, beamline energy
   //string pdfName = "NNPDF31_nlo_as_0118";
   //string pdfName = "MMHT2014nlo68cl";
   cout << endl << "Simulation File Parameters:" << endl;
@@ -637,11 +642,13 @@ int main(Int_t argc, char *argv[]) {
     start_i = stop_i;  // . Added this
   }
 
-  fits_file.open (PDF_NAME + "_Fitted_Values_for_each_x.csv");
+  fits_file.open (PDF_NAME + "_" + to_string(beamE) + 
+		  "GeV_PDFStuff_Fitted_Values_for_each_x.csv");
   fits_file << "x,d/u,d/u err";
 
+  int length = du_x[0].size();
   cout << endl <<endl << du_x[0].size() << endl;
-  for(int i=0; i < du_x[0].size(); i++) {
+  for(int i=0; i < length; i++) {
     std::cout << " (du_x[0])[i]=" << (du_x[0])[i];
     std::cout << " (du_fitted[0])[i]=" << (du_fitted[0])[i];
     std::cout << " (du_f_err[0])[i]=" << (du_f_err[0])[i] << endl;
@@ -650,7 +657,6 @@ int main(Int_t argc, char *argv[]) {
   }
   cout <<endl << endl;
   
-  int length = du_x[0].size();
   double du_x_a[du_x[0].size()];
   std::copy((du_x[0]).begin(), (du_x[0]).end(), du_x_a);
   double du_f_a[(du_fitted[0]).size()];
@@ -690,7 +696,8 @@ int main(Int_t argc, char *argv[]) {
   legend->AddEntry(lineplot,"CT18NLO","PL");
   legend->Draw("same");
   c1->Update();
-  c1->SaveAs("file_name.png");
+  //string plot_name = "du_plot_" + PDF_NAME + "_" + std::to_string(BEAM_E) + "GeV.png";
+  c1->SaveAs("du_plot.png");//plot_name);//"du_plot_" + PDF_NAME + "_" + std::to_string(BEAM_E) + "GeV.png");
   //  Np++
   //.//}
   /*
