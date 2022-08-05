@@ -23,11 +23,25 @@ using namespace LHAPDF;
 
 // USER INPUTS:
 const Double_t RUNTIME_DAYS = 90.0;  // Number of days the experiment runs
-const Double_t BEAM_POLARIZ  =0.85;  // Beam polarization
+const Double_t BEAM_POLARIZ = 0.85;  // Beam polarization
 const Double_t SIN2_TH = 0.235;  // Sin^2(theta_w), (theta_w = weak mixing angle)
 const string PDF_NAME = "CT18NLO";
-Double_t BEAM_E = 11;//11;
-const vector<string> PDF_names = {"CT18NLO", "CT18NLO"};//"PDF4LHC21_40"};  // Vector of  PDFs to analyze
+Double_t BEAM_E = 11;  // GeV
+const string NQ2BINS = "14";  // Max # of Q2 bins (30 for 22 GeV, 14 for 11 GeV)
+const string NXBINS = "10";  // Max # of x bins
+// Q2 v x grid file directory and name
+const string INFILE_DIR = "/w/eic-scshelf2104/users/gsevans/8thWeekSULIs22/" + \
+  to_string(int(BEAM_E)) + "GeV_files/";
+const string INFILE_NAME = "Q2x_" + NQ2BINS + "x" + NXBINS + "_rateGrid_" + \
+  to_string(int(BEAM_E)) + "GeV_" + to_string(int(RUNTIME_DAYS)) + "days_" + \
+  to_string(int(BEAM_POLARIZ * 100)) + "Polarization_ProtonTarget.csv"; 
+// Names of files to store results in
+const string OUTFILE_ALLBINS = PDF_NAME + "_" + to_string(int(BEAM_E)) +
+  "GeV_from" + NQ2BINS + "x" + NXBINS + "grid_analytic_values_for_all_bins.csv";
+const string OUTFILE_XBINS = PDF_NAME + "_" + to_string(int(BEAM_E)) +
+  "GeV_from" + NQ2BINS + "x" + NXBINS + "grid_analytic_values_for_each_x.csv";
+const string OUTFILE_FITS = PDF_NAME + "_" + to_string(int(BEAM_E)) +
+  "GeV_from" + NQ2BINS + "x" + NXBINS + "grid_fitted_values_for_each_x.csv";
 
 // Create a new type that can return two values  // uod
 struct Asym_Values{
@@ -37,16 +51,16 @@ struct Asym_Values{
 double r_prime=0.0;
 
 // Constants
-const Double_t GF = 1.16637e-5;  // GeV^2, Fermi constant
-const Double_t ALPHA = 7.2973525e-3;  // Fine structure constant
-const Double_t MP = 0.93828;  // GeV/c^2 Mass of a proton
+const Double_t GF = 1.16638e-5;  // GeV^2, Fermi constant
+const Double_t ALPHA = 7.29735256e-3;  // Fine structure constant
+const Double_t MP = 0.93827;  // GeV/c^2 Mass of a proton
 
-const Int_t MAXBINS = 500;  // . changed to 2000 to work with the fine grid
+const Int_t MAXBINS = 500; 
 
 //NOTE: The arrays are declared with fixed size, larger than what is needed for any file, to avoid overly complicated dynamic memory allocation
 Double_t Gx[MAXBINS];
 Double_t GQ2[MAXBINS];
-Double_t Grate[MAXBINS]; // . Added this
+Double_t Grate[MAXBINS]; 
 Double_t Gu[MAXBINS];
 Double_t Gubar[MAXBINS];
 Double_t Gd[MAXBINS];
@@ -55,34 +69,32 @@ Double_t Gc[MAXBINS];
 Double_t Gcbar[MAXBINS];
 Double_t Gs[MAXBINS];
 Double_t Gsbar[MAXBINS];
-Double_t Gy[MAXBINS];
-Double_t GY[MAXBINS];  // . added this
+Double_t GY[MAXBINS];
 
 Double_t GA_clean[MAXBINS];  // Predicted A with no noise
 Double_t GA_noisy[MAXBINS];  // Predicted A with noise added
 // .  Some of these might not need to be global:
 Double_t GA_cor_shift[MAXBINS];  // Pred. A w/ uncor. noise shifted by 1sigma cor
-Double_t GA_clean_sim[MAXBINS];  // Predicted A ignoring sea, s, and c quarks
+Double_t GA_clean_sim[MAXBINS];  // Predicted A ignoring sea quarks
 Double_t GA_fit[MAXBINS];  // Container for the fitted A value
 
 // . Add the G for Global
 // Global so can be used in error matrix
 Double_t dA_stat[MAXBINS];  // Statistical error in A
 Double_t dA_sys_uncor[MAXBINS];  // Uncorrelated systematic error in A
-Double_t GdA_tot_uncor[MAXBINS];  // Total uncorrelated error (stat+uncor sys) in A
+Double_t GdA_tot_uncor[MAXBINS];  // Total uncor error (stat+uncor sys) in A
 Double_t dA_sys_cor[MAXBINS];  // Correlated systematic error in A
 
-
-Double_t Ggoodness[MAXBINS];  // . Use or delete
+Double_t Ggoodness[MAXBINS];  // . Use or delete uod
 
 // . As time turn these to not global variables
 Double_t GA_const[MAXBINS];  // . added this
 
 
-Int_t start_i = 0;  // . added Values for when to start the next x
+Int_t start_i = 0;  // . added Values for when to start the next xdescribe what these are for
 Int_t stop_i = 0;
 
-// . Added below 3 lines
+const vector<string> PDF_names = {"CT18NLO", "CT18NLO"};//"PDF4LHC21_40"};  // Vector of  PDFs to analyze // . uod if use, move up uod. if del, fix below
 std::vector<std::vector<double>> du_fitted(sizeof(PDF_names), vector<double>(0));
 std::vector<std::vector<double>> du_f_err(sizeof(PDF_names), vector<double>(0));
 std::vector<std::vector<double>> du_x(sizeof(PDF_names), vector<double>(0));
@@ -93,11 +105,10 @@ std::vector<double> chi_square[6];  // . uod
 double temporary_val =0.0;
 //double PDF_O_D[90][90][90];
 std::map<pair<int,int>, double> PDF_O_D;  // uod
-//int counter = 0; // How many entries  // . uod
 //PDF_O_D.clear();
-ofstream Outfile;
-int error_type;
-int lum_sets=0;
+ofstream Outfile;  // . not sure how this works
+int error_type; // . uod
+int lum_sets=0; // . uod
 
 // Prep for exporting data
 ofstream all_bins_file;
@@ -107,8 +118,8 @@ ofstream fits_file;
 void calcAsym(string fileName, string pdfName, double beamE) {
   cout << "PDFNAME=" << pdfName << endl;
   
-  all_bins_file.open (PDF_NAME + "_" + to_string(beamE) + 
-		      "GeV_PDFStuff_Analytic_Values_for_All_Bins.csv");
+  // Set up file for saving data for each bin
+  all_bins_file.open (OUTFILE_ALLBINS);
   all_bins_file << "x,Q2 (GeV^2),rate (Hz),A_clean,A_noisy,A_simplified,";
   all_bins_file << "dA_stat,dA_sys_uncor,dA_sys_cor,";
   all_bins_file << "d/u noisy,d/u clean,d/u PDF,d/u simplified,";
@@ -116,16 +127,9 @@ void calcAsym(string fileName, string pdfName, double beamE) {
   all_bins_file << "d(d/u) from A_stat,d(d/u) from A_sys_uncor,";
   all_bins_file << "d(d/u) from A_sys_cor,d(d/u) from sin^2(theta_w),";
   all_bins_file << "d(d/u) from model\n";
-  /*  all_bins_file << "a,b,c,d,g,f,ffffds\n";
-  all_bins_file << "howdie\n";
-  all_bins_file << "and, another one , bits, the ,dust";
-  all_bins_file << "yeep, yep,\n";
-  all_bins_file << "test, 2, 3,";
-  all_bins_file << "and4";
-  all_bins_file.close();*/
 
-  x_cols_file.open (PDF_NAME + "_" + to_string(beamE) +
-		    "GeV_PDFStuff_Analytic_Values_for_each_x.csv");
+  // Set up file for saving data for each x
+  x_cols_file.open (OUTFILE_XBINS);
   x_cols_file << "x,Q2 (GeV^2),rate (Hz),";
   x_cols_file << "d/u noisy,d/u clean,d/u PDF,d/u simplified,";
   x_cols_file << "d/u shifted by 1 sig sys cor,";
@@ -133,16 +137,15 @@ void calcAsym(string fileName, string pdfName, double beamE) {
   x_cols_file << "d(d/u) from A_sys_cor,d(d/u) from sin^2(theta_w),";
   x_cols_file << "d(d/u) from model\n";
 
-
-  Int_t i = 0;
-  const PDF* pdf = mkPDF(pdfName, 0);
+  const PDF* pdf = mkPDF(pdfName, 0); // Set up the PDF
+  // Obtain the input file
   fstream inputFile;
-  cout << "fileName=" << fileName << endl;
+  cout << "input file name=" << fileName << endl;
   inputFile.open(fileName,fstream::in);
   
   // Set up random variables for use in generating pseudo-data
   TRandom *random = new TRandom();
-  r_prime = random->Gaus();  // Random variable to be used with correlated systematic uncertainties
+  r_prime = random->Gaus();  // Random variable to be used with cor sys unc
 
   // Get coupling constants
   double C_1d = 1/2. - 2 * SIN2_TH / 3;
@@ -154,7 +157,6 @@ void calcAsym(string fileName, string pdfName, double beamE) {
   //cout << C_2u << endl;
 
   // Sums to be averaged when calculating analytic uncertainty for a value of x
-  int num = 0;  // Number of bins for a given value of x
   double xSum = 0;  // x
   double Q2Sum = 0;  // Q2 (GeV^2)
   double rateSum = 0;  // rate (Hz)
@@ -162,22 +164,20 @@ void calcAsym(string fileName, string pdfName, double beamE) {
   double duSum_clean = 0;  // d/u calculated using psuedo-data (no noise) 
   double duSum_exact = 0;  // d/u calculated using quark PDF values
 
-  double weights = 0;
-  double dduSum_A_sys_uncor = 0;
-  double dduSum_sin2th = 0;
+  double weights = 0;  // Weights for each bin (dependent on rate)
+  double dduSum_A_sys_uncor = 0;  // Unc in d/u due to A_sys_uncor
+  double dduSum_sin2th = 0;  // Unc in d/u due to sin2th_unc
 
-  double duSum_sys_cor_shift = 0;
+  double duSum_sys_cor_shift = 0;  // Unc in d/u due to A_sys_cor
 
-  double duSum_sim = 0;
+  double duSum_sim = 0;  // Unc in d/u due to ignoring sea quarks
 
   // Read data from input file and use it (along with pdfs) to create pseudo-data
   string file_line;
   getline(inputFile, file_line);  // Remove header before looping
+  Int_t i = 0;
   // Loop through the input file one line at a time
   while (getline(inputFile, file_line)) {
-    //cout << "TOP OF WHILE LOOP" << endl;
-    //cout << "_______________________________________" << endl;
-
     // Read the current line one piece of data at a time.
     // Assumes file is formatted as follows: x,Q2,rate
     vector<string> tokens; // storage for tokens 
@@ -190,7 +190,8 @@ void calcAsym(string fileName, string pdfName, double beamE) {
     GQ2[i] = stof(tokens[1]);  // GeV^2 
     Grate[i] = stof(tokens[2]);  // Hz (rate)
 
-    // If just finished a value of x and are moving onto a new x,
+    // If just finished a value of x and are moving onto a new x, do things
+    // (Located at top of while loop right below obtaining the latest x)
     if (Gx[i] != Gx[i-1] and i != 0) {
       // Print out the average values for this x
       double xCom = xSum / weights;
@@ -214,22 +215,22 @@ void calcAsym(string fileName, string pdfName, double beamE) {
       cout << dduCom_sin2th << endl;
 
       double duCom_sys_cor_shift = duSum_sys_cor_shift / weights;
-      double dduCom_A_sys_cor = duSum_noisy / weights - duCom_sys_cor_shift;
+      double dduCom_A_sys_cor = duCom_noisy - duCom_sys_cor_shift;
       cout << "Noisy d/u - Correlated Sys. Shifted d/u: ";
       cout << dduCom_A_sys_cor << endl;
 
       double duCom_sim = duSum_sim / weights;
-      double dduCom_model = duCom_sim - duSum_clean / weights;
+      double dduCom_model = duCom_sim - duCom_clean;
       cout << "Simplified_A d/u - clean_A d/u: ";
       cout << dduCom_model << endl;
 
-
+      // Fille the file which stores info for each x
       x_cols_file << xCom << "," << Q2Com << "," << rateSum;
 
       x_cols_file << "," << duCom_noisy << "," << duCom_clean;
       x_cols_file << "," << duCom_exact;
 
-      x_cols_file << "," << duCom_sys_cor_shift << "," << duCom_sim;
+      x_cols_file << "," << duCom_sim << "," << duCom_sys_cor_shift;
 
       x_cols_file << "," << dduCom_A_stat << "," << dduCom_A_sys_uncor;
       x_cols_file << "," << abs(dduCom_A_sys_cor) << "," << dduCom_sin2th;
@@ -241,7 +242,6 @@ void calcAsym(string fileName, string pdfName, double beamE) {
       xSum = 0;
       Q2Sum = 0;
       rateSum = 0;
-      num = 0;
       duSum_noisy = 0;
       duSum_clean = 0;
       duSum_exact = 0;
@@ -255,14 +255,14 @@ void calcAsym(string fileName, string pdfName, double beamE) {
     }
     
     // Obtain quark PDF values
-    Gd[i] = (pdf->xfxQ2(1, Gx[i], GQ2[i]));// / Gx[i];  // d
-    Gdbar[i] = (pdf->xfxQ2(-1, Gx[i], GQ2[i]));// / Gx[i];  // dbar
-    Gu[i] = (pdf->xfxQ2(2, Gx[i], GQ2[i]));// / Gx[i];  // u
-    Gubar[i] = (pdf->xfxQ2(-2, Gx[i], GQ2[i]));// / Gx[i];  // ubar
-    Gs[i] = (pdf->xfxQ2(3, Gx[i], GQ2[i]));// / Gx[i];  // s
-    Gsbar[i] = (pdf->xfxQ2(-3, Gx[i], GQ2[i]));// / Gx[i];  // sbar
-    Gc[i] = (pdf->xfxQ2(4, Gx[i], GQ2[i]));// / Gx[i];  // c
-    Gcbar[i] = (pdf->xfxQ2(-4, Gx[i], GQ2[i]));// / Gx[i];  // cbar
+    Gd[i] = (pdf->xfxQ2(1, Gx[i], GQ2[i]));  // d
+    Gdbar[i] = (pdf->xfxQ2(-1, Gx[i], GQ2[i]));  // dbar
+    Gu[i] = (pdf->xfxQ2(2, Gx[i], GQ2[i]));  // u
+    Gubar[i] = (pdf->xfxQ2(-2, Gx[i], GQ2[i]));  // ubar
+    Gs[i] = (pdf->xfxQ2(3, Gx[i], GQ2[i]));  // s
+    Gsbar[i] = (pdf->xfxQ2(-3, Gx[i], GQ2[i]));  // sbar
+    Gc[i] = (pdf->xfxQ2(4, Gx[i], GQ2[i]));  // c
+    Gcbar[i] = (pdf->xfxQ2(-4, Gx[i], GQ2[i]));  // cbar
       
     // Obtain valance and plus quark PDF values
     double d_p = Gd[i] + Gdbar[i];
@@ -275,8 +275,8 @@ void calcAsym(string fileName, string pdfName, double beamE) {
     double c_V = Gc[i] - Gcbar[i];
     
     // Obtain y and Y
-    Gy[i] = GQ2[i] / (2 * MP * Gx[i] * beamE);  // Inelasticity
-    GY[i] = (1 - (1-Gy[i]) * (1-Gy[i])) / (1 + (1-Gy[i]) * (1-Gy[i]));
+    double y = GQ2[i] / (2 * MP * Gx[i] * beamE);  // Inelasticity
+    GY[i] = (1 - (1-y) * (1-y)) / (1 + (1-y) * (1-y));
       
     // Create theoretical A_{RL,p}^{e^{-},PVDIS}
     GA_const[i] = BEAM_POLARIZ * 3 * sqrt(2) * GF * GQ2[i] / 
@@ -288,7 +288,6 @@ void calcAsym(string fileName, string pdfName, double beamE) {
     // Divisor of A's equation
     double A_div = 4 * (u_p + c_p) + (d_p + s_p); 
     GA_clean[i] = GA_const[i] * (A_tleft + A_tright) / A_div;  // A_theory
-    //    all_bins_file << "," << GA_clean[i];
 
     // Calculate uncertainties
 
@@ -301,7 +300,7 @@ void calcAsym(string fileName, string pdfName, double beamE) {
     dA_sys_cor[i] = abs(GA_clean[i]) * sqrt(0.004*0.004 + 0.002*0.002); 
     // Total uncorrelated uncertainty
     GdA_tot_uncor[i] = sqrt(dA_stat[i]*dA_stat[i] + 
-			  dA_sys_uncor[i]*dA_sys_uncor[i]);
+			    dA_sys_uncor[i]*dA_sys_uncor[i]);
     // Create the psuedo-data that has noise based on uncertainty
     GA_noisy[i] = GA_clean[i] + random->Gaus()*GdA_tot_uncor[i] 
       + r_prime*dA_sys_cor[i];
@@ -311,7 +310,7 @@ void calcAsym(string fileName, string pdfName, double beamE) {
     // d/u error stuff
     //cout << "x=" << Gx[i] << ", 
     cout << "Q2=" << GQ2[i];
-    // Error in d/u due to statistical uncertainty in A 
+    // Error in d/u due to statistical uncertainty in A  
     double ddu_A_stat = abs(dA_stat[i] * 
       ((-2)*GA_const[i] * (2*C_1d + C_1u + (2*C_2d + C_2u)*GY[i]) /
        pow((GA_clean[i] + C_1d*GA_const[i] + C_2d*GY[i]*GA_const[i]), 2)));
@@ -389,7 +388,7 @@ void calcAsym(string fileName, string pdfName, double beamE) {
     duSum_sim += weight * du_sim;
     double ddu_model = du_sim - du_clean;
 
-
+    // Fill the file that saves info for each bin
     all_bins_file << Gx[i] << "," << GQ2[i] << "," << Grate[i];
 
     all_bins_file << "," << GA_clean[i] << "," << GA_noisy[i];
@@ -399,7 +398,7 @@ void calcAsym(string fileName, string pdfName, double beamE) {
     all_bins_file << "," << dA_sys_cor[i];
 
     all_bins_file << "," << du_noisy << "," << du_clean << "," << du_exact;
-    all_bins_file << "," << du_sys_cor_shift << "," << du_sim;
+    all_bins_file << "," << du_sim << "," << du_sys_cor_shift;
 
     all_bins_file << "," << ddu_A_stat << "," << ddu_A_sys_uncor;
     all_bins_file << "," << ddu_sys_cor_shift << "," << ddu_sin2th;
@@ -408,11 +407,10 @@ void calcAsym(string fileName, string pdfName, double beamE) {
     xSum += Gx[i] * weight;
     Q2Sum += GQ2[i] * weight;
     rateSum += Grate[i];
-    num += 1;
 
     i++;
-    //counter++;
   }
+  // Print out values for this x (located after while loop to get last value)
   double xCom = xSum / weights;
   double Q2Com = Q2Sum / weights;
   double duCom_noisy = duSum_noisy / weights;
@@ -434,19 +432,20 @@ void calcAsym(string fileName, string pdfName, double beamE) {
   cout << dduCom_sin2th << endl;
 
   double duCom_sys_cor_shift = duSum_sys_cor_shift / weights;
-  double dduCom_A_sys_cor = duSum_noisy / weights - duCom_sys_cor_shift;
+  double dduCom_A_sys_cor = duCom_noisy - duCom_sys_cor_shift;
   cout << "Noisy d/u - Correlated Sys. Shifted d/u: ";
   cout << dduCom_A_sys_cor << endl;
 
   double duCom_sim = duSum_sim / weights;
-  double dduCom_model = duCom_sim - duSum_clean / weights;
+  double dduCom_model = duCom_sim - duCom_clean;
   cout << "Simplified_A d/u - clean_A d/u: ";
   cout << dduCom_model << endl;
 
+  // Save data to x file
   x_cols_file << xCom << "," << Q2Com << "," << rateSum;
   x_cols_file << "," << duCom_noisy << "," << duCom_clean;
   x_cols_file << "," << duCom_exact;
-  x_cols_file << "," << duCom_sys_cor_shift << "," << duCom_sim;
+  x_cols_file << "," << duCom_sim << "," << duCom_sys_cor_shift;
   x_cols_file << "," << dduCom_A_stat << "," << dduCom_A_sys_uncor;
   x_cols_file << "," << abs(dduCom_A_sys_cor) << "," << dduCom_sin2th;
   x_cols_file << "," << abs(dduCom_model) << "\n";
@@ -459,11 +458,7 @@ void calcAsym(string fileName, string pdfName, double beamE) {
   delete pdf;
   inputFile.close();
 }
-//______________________________________________________________________________
-/* Asym_Values func(Double_t x, Double_t q2, Double_t y,
-     Double_t u, Double_t ubar,Double_t d, Double_t dbar,Double_t s, Double_t sbar,Double_t c, Double_t cbar,
-     Double_t *par)*/
-// . Made return type double instead of blank
+
 double func(Double_t *par, Int_t i) {
 
   // . Potentially delete new structure type Asym-Values or find a way to use it
@@ -481,15 +476,16 @@ double func(Double_t *par, Int_t i) {
     (2.0*C_1u + 2.0*GY[i]*C_2u - par[0]*(C_1d + GY[i]*C_2d));
   Double_t A_denominator = par[0] + 4;
 
-  return (A_numerator/A_denominator); //return type needs to be of the form of double
+  return (A_numerator/A_denominator); 
   //return Asym;
 }
+
 //______________________________________________________________________________
 void fcn(Int_t &npar, Double_t *gin, Double_t &f, Double_t *par, Int_t iflag) {
 
   // Create and fill error matrix
   //Asym_Values Calculation;  // . Commented out. Use or delete this line
-  int nbins = stop_i - start_i;  
+  int nbins = stop_i - start_i;  // . indicate that those are global
   TMatrixT<double> Err_matrix(nbins, nbins);
   TMatrixT<double> Stat_Err_matrix(nbins, nbins);
   for (int i=0; i<nbins; i++) {
@@ -499,9 +495,8 @@ void fcn(Int_t &npar, Double_t *gin, Double_t &f, Double_t *par, Int_t iflag) {
 			       + pow(dA_sys_uncor[i+start_i],2) + pow(dA_sys_cor[i+start_i],2));
       }
       else{	 	 	
-	Stat_Err_matrix(i,j) = 0.0; 
-	// . should this equal pow(dA_sys_cor[i+start_i],2)?
-	// This assumes that there are no off-diagonal elements
+	Stat_Err_matrix(i,j) = pow(dA_sys_cor[i+start_i],2); 
+	// set to 0.0 to assume that there are no off-diagonal elements
       }
     }
   }
@@ -511,33 +506,22 @@ void fcn(Int_t &npar, Double_t *gin, Double_t &f, Double_t *par, Int_t iflag) {
   Err_matrix = Stat_Err_matrix;
 
   //calculate chisquare
-  //Double_t chisq = 0;
   Double_t delta;
-  //Double_t Pseduo=0.0;
-  //TRandom *random_2 = new TRandom();
   for(int i = start_i; i < stop_i; ++i) { 
     GA_fit[i] = func(par, i);  
     
-    delta = (GA_noisy[i] - GA_fit[i]);///GdA_t_uncor[i];
-    //delta = (Pseduo-GA_fit[i])/GdA_t_uncor[i]; 
-    //chisq += (abs(Ggoodness[i] - 1.0000) < 0.1)*delta*delta;
-    //Diff(0,i) = (abs(Ggoodness[i] - 1.0000) < 0.1)*pow((GA_noisy[i]-GA_fit[i]),1);
-    //Diff(0,i) = (abs(Ggoodness[i] - 1.0000) < 0.1)*pow((Pseduo-GA_fit[i]),1); 
-    // Diff(0,i) =pow((Pseduo-GA_fit[i]),1);
-    Diff(0,i-start_i) = delta;//*delta;
+    delta = (GA_noisy[i] - GA_fit[i]);
+    Diff(0,i-start_i) = delta;
   }
 
   TMatrixT<double> Invt(nbins, nbins);
   
   Err_matrix.SetTol(1.e-26);
-  //double det = Err_matrix.Determinant(); 
   Double_t det_2 = 0.0;
   Invt = Err_matrix.Invert(&det_2);
-  //Invt = Err_matrix.InvertFast(&det_2);
   Diff_T.Transpose(Diff);
   TMatrixT<double> Temp(nbins, nbins);
   TMatrixT<double> chi(1, nbins);
-  //Temp.Mult(Diff,Err_matrix);
   Temp.Mult(Diff, Invt);  
   chi.Mult(Temp, Diff_T);
   f = chi.Sum();
@@ -545,53 +529,42 @@ void fcn(Int_t &npar, Double_t *gin, Double_t &f, Double_t *par, Int_t iflag) {
 //______________________________________________________________________________
 
 int main(Int_t argc, char *argv[]) {
-
+  // . Doesn't actually need argc anymore, but I don't know how to get rid of it
   if(argc < 1) {
     cout << "Please call with appropriate arguments:" << endl;
-    cout << "./codeName beamType luminosity withUnfolding(true/false) inputFile";
     cout << endl;
     return -1;
   }
-  //TCanvas* c1 = new TCanvas("c1", "c1", 800, 600); //.//
-  //int Np = 0;//.//
-  string fileName = argv[1];
-  
-  //.//string pdfName = "CT18NLO";
-  //for (vector<string>::iterator t=PDF_names.begin(); t!=PDF_names.end(); ++t){
-  //  string pdfName = *t;
-  //for (auto &pdfName: PDF_names) {
-  //for (int Np = 0; Np < PDF_names.size(); ++Np) {
-  //string pdfName = PDF_names[Np];
+
+  string fileName = INFILE_DIR + INFILE_NAME;
+  cout << fileName << endl;
   double beamE = BEAM_E; // GeV, beamline energy
-  //string pdfName = "NNPDF31_nlo_as_0118";
-  //string pdfName = "MMHT2014nlo68cl";
   cout << endl << "Simulation File Parameters:" << endl;
   cout << "File name: " << fileName << endl;
   cout << "Without unfolding" << endl;   // . What does this mean?
-  cout << "Polarization: " << BEAM_POLARIZ << "%" << endl << endl;
+  cout << "Polarization: " << BEAM_POLARIZ << endl << endl;
   
-  //calcAsym(fileName, pdfName, flagUnfolding, luminosity,beamTypeStr,Ordered_values);
-  calcAsym(fileName, PDF_NAME, beamE);   // . was pdfName
-  int i = 0;// . added the below loop and if statement and stop_i
-  cout << "Gx[i]" << Gx[i]; 
-  while (Gx[i] > 0) {
-    //cout << endl << "Gx[i]=" << Gx[i] << ", i=" << i << ", Gx[i+1]=" << Gx[i+1];
+  // Read data from the file and calculate analytical values
+  calcAsym(fileName, PDF_NAME, beamE);  
 
+  // Fit the data
+
+  int i = 0;
+  cout << "Gx[i]" << Gx[i]; 
+  // Loop through all x's
+  while (Gx[i] > 0) {
+
+    // If starting a new x,
     if (Gx[i] != Gx[i+1]) {
       stop_i = i + 1;
-      //cout << ", stop_i=" << stop_i << ", start_i=" << start_i;
-       
+      
       // Instantiate Minuit for 1 parameter
-      TMinuit *gMinuit = new TMinuit(1);//4); 
+      TMinuit *gMinuit = new TMinuit(1); 
       gMinuit->SetFCN(fcn);  // Set the address of the function to be minimized
       
-      //Perform fit with betas fixed
-      //--------------------------------------------------------------------
-      //cout << endl << "Betas fixed" << endl;
       Double_t arglist[10];
       Int_t ierflg = 0;
       
-      // . I'm considering commenting out the next two lines because https://llr.in2p3.fr/activites/physique/glast/workbook/pages/advanced_GRUG/GRUGminuit.pdf  doesn't have them and I can't find a good explanation of what they do
       arglist[0] = 1;  // 1 because we want a chisquare fit
       gMinuit->mnexcm("SET ERR", arglist, 1, ierflg);
       
@@ -600,34 +573,12 @@ int main(Int_t argc, char *argv[]) {
       // Set information for the parameter (like bounds)
       gMinuit->mnparm(0, "d/u", vstart[0], step[0], 0, 1, ierflg); // or 0, 0 to have no bounds
       
-      // . I Commented out the next four lines because they seem like they don't need to be fixed, but I only kind of understand what is going on. I uncommented the 500 lines since it's in https://llr.in2p3.fr/activites/physique/glast/workbook/pages/advanced_GRUG/GRUGminuit.pdf
       arglist[0] = 500; // Max calls
-      arglist[1] = .001;  // Tolerance  (was 1)
-      //gMinuit->FixParameter(1);
-      
-      //gMinuit->SetPrintLevel(1);
-      //double tmp_sin=0.0;
-      //double tmp_error=0.0;
-      //gMinuit -> GetParameter(0,tmp_sin,tmp_error);
-      //cout<<"tmp_sin"<<","<<tmp_sin<<","<<tmp_error<<endl;
+      arglist[1] = .001;  // Tolerance 
       // arglist is a list of arguments that MIGRAD takes. 2 means that it takes two arguments from arglist (I think based on https://root-forum.cern.ch/t/understanding-minuit/34836/5 )
       // Minimize the function
       gMinuit->mnexcm("MIGRAD", arglist, 2, ierflg);
-      //gMinuit->mnexcm("SCAN", arglist, 0, ierflg);   
-      //cout<<"tmp_sin"<<","<<tmp_sin<<","<<tmp_error<<endl;
-      //--------------------------------------------------------------------
-      
-      // Print results
-      /*
-	Double_t amin,edm,errdef;
-	Int_t nvpar,nparx,icstat;
-	gMinuit->mnstat(amin,edm,errdef,nvpar,nparx,icstat);
-	//gMinuit->mnprin(3,amin);*/
-      
-      /*
-	for(int i = 0; i < NBINS; ++i)
-	cout << GA_clean[i] << "   " << GA_fit[i] << endl;
-      */
+
       double du_out, err;
       gMinuit -> GetParameter(0, du_out, err);
       Outfile << du_out << "," << err << endl;
@@ -637,17 +588,16 @@ int main(Int_t argc, char *argv[]) {
       
       delete gMinuit;
     }
-    i++;  // . Added this
+    i++;
     cout << "start_i=" << start_i << ", stop_i=" << stop_i;
-    start_i = stop_i;  // . Added this
+    start_i = stop_i;  
   }
 
-  fits_file.open (PDF_NAME + "_" + to_string(beamE) + 
-		  "GeV_PDFStuff_Fitted_Values_for_each_x.csv");
+  fits_file.open (OUTFILE_FITS);
   fits_file << "x,d/u,d/u err";
 
   int length = du_x[0].size();
-  cout << endl <<endl << du_x[0].size() << endl;
+  cout << endl <<endl;
   for(int i=0; i < length; i++) {
     std::cout << " (du_x[0])[i]=" << (du_x[0])[i];
     std::cout << " (du_fitted[0])[i]=" << (du_fitted[0])[i];
@@ -680,7 +630,6 @@ int main(Int_t argc, char *argv[]) {
   auto lineplot = new TGraph((du_x[0]).size(), du_x_a, du_f_a);
   TCanvas* c1 = new TCanvas("c1", "c1", 800, 600);
 
-  //gr->SetFillColor(2);
   gr->SetFillColorAlpha(2, 0.35);
   gr->GetXaxis()->SetTitle("x");
   gr->GetYaxis()->SetTitle("d/u");
@@ -689,23 +638,12 @@ int main(Int_t argc, char *argv[]) {
   lineplot->SetMarkerStyle(7);
   lineplot->SetMarkerColorAlpha(2, 0.35); 
   lineplot->SetLineColor(2);
-    lineplot->SetTitle("CT18NLO");//"Fitted d/u values");
+  lineplot->SetTitle("CT18NLO");
   lineplot->Draw("same PL");
-  //gPad->BuildLegend();
   auto legend = new TLegend(.1, .1, .3, .3, "legend");
   legend->AddEntry(lineplot,"CT18NLO","PL");
   legend->Draw("same");
   c1->Update();
-  //string plot_name = "du_plot_" + PDF_NAME + "_" + std::to_string(BEAM_E) + "GeV.png";
-  c1->SaveAs("du_plot.png");//plot_name);//"du_plot_" + PDF_NAME + "_" + std::to_string(BEAM_E) + "GeV.png");
-  //  Np++
-  //.//}
-  /*
-  vector<string> data={"Hello World!","Goodbye World!"};
-  for (vector<string>::iterator t=data.begin(); t!=data.end(); ++t) 
-    {
-      cout<<*t<<endl;
-    }
-  */
+  c1->SaveAs("du_plot.png");
   return 0;
 }
