@@ -26,12 +26,11 @@ const Double_t RUNTIME_DAYS = 90.0;  // Number of days the experiment runs
 const Double_t BEAM_POLARIZ = 0.85;  // Beam polarization
 const Double_t SIN2_TH = 0.235;  // Sin^2(theta_w), (theta_w = weak mixing angle)
 const string PDF_NAME = "CT18NLO";
-Double_t BEAM_E = 11;  // GeV
-const string NQ2BINS = "14";  // Max # of Q2 bins (30 for 22 GeV, 14 for 11 GeV)
+Double_t BEAM_E = 22;  // GeV
+const string NQ2BINS = "30";  // Max # of Q2 bins (30 for 22 GeV, 14 for 11 GeV)
 const string NXBINS = "10";  // Max # of x bins
 // Q2 v x grid file directory and name
-const string INFILE_DIR = "/w/eic-scshelf2104/users/gsevans/8thWeekSULIs22/" + \
-  to_string(int(BEAM_E)) + "GeV_files/";
+const string INFILE_DIR = "./Files/" + to_string(int(BEAM_E)) + "GeV_files/";
 const string INFILE_NAME = "Q2x_" + NQ2BINS + "x" + NXBINS + "_rateGrid_" + \
   to_string(int(BEAM_E)) + "GeV_" + to_string(int(RUNTIME_DAYS)) + "days_" + \
   to_string(int(BEAM_POLARIZ * 100)) + "Polarization_ProtonTarget.csv"; 
@@ -579,6 +578,7 @@ int main(Int_t argc, char *argv[]) {
       // Minimize the function
       gMinuit->mnexcm("MIGRAD", arglist, 2, ierflg);
 
+      // Extract the fit data
       double du_out, err;
       gMinuit -> GetParameter(0, du_out, err);
       Outfile << du_out << "," << err << endl;
@@ -593,9 +593,11 @@ int main(Int_t argc, char *argv[]) {
     start_i = stop_i;  
   }
 
+  // Set up file for saving the fit data
   fits_file.open (OUTFILE_FITS);
   fits_file << "x,d/u,d/u err";
 
+  // Save and print the fit data
   int length = du_x[0].size();
   cout << endl <<endl;
   for(int i=0; i < length; i++) {
@@ -607,11 +609,12 @@ int main(Int_t argc, char *argv[]) {
   }
   cout <<endl << endl;
   
-  double du_x_a[du_x[0].size()];
+  // Prepare the fit data for plotting. Made this way anticipating looping through multiple sets of fitted values (a set for each PDF under analysis), but instead it was decided to just analyze one set of fitted values at a time.
+  double du_x_a[length];
   std::copy((du_x[0]).begin(), (du_x[0]).end(), du_x_a);
-  double du_f_a[(du_fitted[0]).size()];
+  double du_f_a[length];
   std::copy((du_fitted[0]).begin(), (du_fitted[0]).end(), du_f_a);
-  double du_f_err_a[(du_f_err[0]).size()];
+  double du_f_err_a[length];
   std::copy((du_f_err[0]).begin(), (du_f_err[0]).end(), du_f_err_a);
   double du_x_err_a[length];
   memset(du_x_err_a, 0, length*sizeof(int));

@@ -7,11 +7,11 @@ plt.close('all')
 
 
 # Variables to change if changing BEAM_E
-BEAM_E = '11'  # GeV
-NQ2bins = '14'  # (Max) number of Q2 bins (30 if 22 GeV, 14 if 11 GeV)
+BEAM_E = '22'  # GeV
+NQ2bins = '30'  # (Max) number of Q2 bins (30 if 22 GeV, 14 if 11 GeV)
 # How many rows at the bottom of each CSV file to ignore
 # 11 GeV: 0; 22 GeV: 1
-footer_vals = 0
+footer_vals = 1
 
 
 # Variables to maybe change if changing BEAM_E
@@ -23,29 +23,29 @@ stacked_errors = False  # Format of band errors
 # Information for loading uncertainty data
 PDF_names = ["CT18NLO"]
 # Variables to store path information for analytic values
-dir_path_a = "/w/eic-scshelf2104/users/gsevans/8thWeekSULIs22/" + BEAM_E + "GeV_files/"
+dir_path_a = "./Files/" + BEAM_E + "GeV_files/"
 file_suffix_a = "_" + BEAM_E + "GeV_from" + NQ2bins + "x" + Nxbins_analytical + "grid_analytic_values_for_each_x.csv"
 foot_a = footer_vals  # How many bottom rows to ignore. 1 for 22 GeV, 0 for 11 GeV
 # Variables to store path information for fitted values
-dir_path_f = "/w/eic-scshelf2104/users/gsevans/8thWeekSULIs22/" + BEAM_E + "GeV_files/"
+dir_path_f = "./Files/" + BEAM_E + "GeV_files/"
 file_suffix_f = "_" + BEAM_E + "GeV_from" + NQ2bins + "x" + Nxbins_analytical + "grid_fitted_values_for_each_x.csv"
 foot_f = footer_vals # How many bottom rows to ignore. 1 for 22 GeV, 0 for 11 GeV
 
 # Information for loading the PDF data
 PDF_names2 = ["NNPDF40_nlo_as_01180", "PDF4LHC21_40", "CT18NLO"]
-dir_path_PDF = "/w/eic-scshelf2104/users/gsevans/8thWeekSULIs22/" + BEAM_E + "GeV_files/"
+dir_path_PDF = "./Files/" + BEAM_E + "GeV_files/"
 file_suffix_PDF = '_' + BEAM_E + 'GeV_qPDF_vals_1x' + Nxbins_PDF + 'grid.csv'
 foot_PDF = 0
 
 # Where to save the picture
-dir_path_pic = "/w/eic-scshelf2104/users/gsevans/8thWeekSULIs22/" + BEAM_E + "GeV_files/"
-pic_suffix = "main_dVuV_uncertainty_plot" + BEAM_E + "GeV.png"
+dir_path_pic = "./Files/" + BEAM_E + "GeV_files/"
+pic_suffix = "main_dVuV_uncertainty_plot" + BEAM_E + "GeV.pdf"
 
 # Begin program
 
 # Plot stuff
 alp = .4  # Transparency in bands
-fig, ax = plt.subplots(figsize=[11,8])  # Report size: [6,5]  # Poster Size: [11,8])
+fig, ax = plt.subplots(figsize=[6,5])  # Report size: [6,5]  # Poster Size: [11,8])
 
 # loop through all PDF names (only tested with PDF_names=["CT18NLO"])
 for pdf_name in PDF_names:

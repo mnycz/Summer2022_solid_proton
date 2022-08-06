@@ -41,7 +41,7 @@ bool Is_Rad = false; //whether we use the rate w/o ineternal and pre-vertex rad 
                      //only the eAll generator has
 
 const char* kKeyList[]={
-  "eAll_commited4fe_rod_6mm_11_LH2_100files_1e6","eDIS_11G", "pDIS_11G", "eDIS_11G_bg", "pDIS_11G_bg",
+  "solid_PVDIS_LH2_moved_full_eAll_filenum100_22GeV_Z10cm_1e6","eDIS_11G", "pDIS_11G", "eDIS_11G_bg", "pDIS_11G_bg",
     "eDIS_nobaffle_11G", "pDIS_nobaffle_11G", "eDIS_nobaffle_11G_bg", "pDIS_nobaffle_11G_bg",
     "eDIS_6.6G", "pDIS_6.6G", "eDIS_6.6G_bg", "pDIS_6.6G_bg",
     "eDIS_nobaffle_6.6G", "pDIS_nobaffle_6.6G", "eDIS_nobaffle_6.6G_bg", "pDIS_nobaffle_6.6G_bg",
@@ -78,7 +78,7 @@ void TH2toTxt(TH2* h2, const char* key, bool skipZero=false)
     FILE * pFile;
     char buf[255];
     // . "/w/eic-scshelf2104/users/gsevans/thirdWeekSULIs22/files_11GeV/%s_%s.txt"
-    pFile = fopen (Form("/w/eic-scshelf2104/users/gsevans/8thWeekSULIs22/11GeV_files/%s_%s.txt",h2->GetName(),key), "w");
+    pFile = fopen (Form("./Files/22GeV_files/%s_%s.txt",h2->GetName(),key), "w");
     fprintf(pFile,"     x     Q2  rate(Hz)\n");
     TAxis *xAxis = h2->GetXaxis();
     TAxis *yAxis = h2->GetYaxis();
@@ -101,9 +101,9 @@ void analysis_PVDIS_FOM_sim(const char* infile, const char* key, double beam=11.
 {
   current_uA=50.0;
   gStyle->SetOptStat(0);
-  cout << "GETTING FILE: " << infile << endl;
+  
     TFile* f = new TFile(infile, "READ");
-    cout << "GOTTEN FILE" << endl;
+    
     TTree* t = (TTree*)f->Get("T");
     double Ei = 0;
     double Q2 = 0;
@@ -125,7 +125,7 @@ void analysis_PVDIS_FOM_sim(const char* infile, const char* key, double beam=11.
     double ecPhi = 0;
     double ecR = 0;
     double ecP = 0;
-    cout << "SETTING BRANCHES" << endl;
+
     t->SetBranchAddress("Ei",       &Ei    );
     t->SetBranchAddress("Q2",       &Q2     );
     t->SetBranchAddress("W",        &W      );
@@ -158,10 +158,9 @@ void analysis_PVDIS_FOM_sim(const char* infile, const char* key, double beam=11.
     double Q2_sum[15] = {0};
     double y_sum[15] = {0};
 
-    int nBinQ2=14; // 14 for 11 GeV, 30 for 22 GeV
-    double Q2Min=0.0,Q2Max=14; //14 for 11 GeV, 30 for 22 GeV
+    int nBinQ2=30; // 14 for 11 GeV, 30 for 22 GeV
+    double Q2Min=0.0,Q2Max=30; //14 for 11 GeV, 30 for 22 GeV
     double nBinx=10;  // 10 for analytic calculations, 100 for PDF
-    cout << "ALMOST TO TH2F STUFF" << endl;
     if(beam>1.0 && beam<7.0) {
      nBinQ2=70;
      Q2Min=0.0;
@@ -175,7 +174,7 @@ void analysis_PVDIS_FOM_sim(const char* infile, const char* key, double beam=11.
     //this histogram just get the rate in Q2 and x bin
     TH2F* tmpRate_acc = new TH2F(Form("rate_Q2x_acc_%.0fuA",current_uA), Form("rate @ %.0f uA (Hz);x;Q^{2} [GeV^{2}]",current_uA), 10, 0, 1, nBinQ2/10,Q2Min,Q2Max);
     TH2F* tmpRate_NoTrigEff = new TH2F(Form("rate_Q2x_NoTrigEff_%.0fuA",current_uA), Form("rate @ %.0f uA (Hz), No trigger eff. cut;x;Q^{2} [GeV^{2}]",current_uA), 10, 0, 1, nBinQ2/10,Q2Min,Q2Max);
-    cout << "PAST TH2F STUFF" << endl;
+    
     for (unsigned int entry = 0; entry < t->GetEntries(); entry++) {
         t->GetEntry(entry);
 	double theta_degree = theta_gen*(180.0/Pi);
@@ -215,11 +214,11 @@ void analysis_PVDIS_FOM_sim(const char* infile, const char* key, double beam=11.
 	  }
 	}
     }
-    cout << "ALMOST DIVIDING" << endl;
+    
     hAbeam_Q2x_acc->Divide(hAbeam_Q2x_acc,hrate_Q2x_acc);
-    cout << "DIVIDED ONE" << endl;
+    
     hAbeamErr_Q2x_acc->Divide(hAbeamErr_Q2x_acc,hAbeam_Q2x_acc);
-    cout << "DONE DIVIDING" << endl;
+    
     /* This section is commented out since it isn't needed when creating grids
     TCanvas *c_AbeamErr_Q2x_acc = new TCanvas("AbeamErr_Q2x_acc","AbeamErr_Q2x_acc",900,600);
     gPad->SetGrid();
@@ -285,9 +284,9 @@ void analysis_PVDIS_FOM_sim(const char* infile, const char* key, double beam=11.
     c1->SaveAs(Form("rate_Q2x_NoTrigEff_%.0fuA_%s.eps",current_uA,key));
     c1->SaveAs(Form("rate_Q2x_NoTrigEff_%.0fuA_%s.C",current_uA,key));
     */
-    cout << "ALMOST TO FILE PLACE" << endl;
+    
     TH2toTxt(hrate_Q2x_acc,key,true);
-    cout << "PAST FILE PLACE" << endl;
+    
     ///TH2toTxt(hrate_Q2x_NoTrigEff,key,true);
     ///TH2toTxt(hAbeamErr_Q2x_acc,key,true);
 }

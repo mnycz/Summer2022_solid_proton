@@ -70,29 +70,29 @@ def calc_unc(row, Grid, N_PDF, base):
 ### USER INPUT ###
 
 # Handle file information
-beamE = "11"
-NQ2bins = "14"
-Nxbins = "100"
+beamE = "22"  # GeV, Beam energy
+NQ2bins = "30"  # (max) number of Q2 bins
+Nxbins = "100"  # (max) number of x bins
 runtime = 90  # days of runtime (this is only used for display in the plot)
 bp = .85  # Beam polarization (this is only used for display in the plot)
+
 # Load the data
-Bins = pd.read_csv('/w/eic-scshelf2104/users/gsevans/8thWeekSULIs22/' + beamE + 'GeV_files/CT18NLO_' + beamE + 'GeV_from' + NQ2bins + 'x' + Nxbins + 'grid_analytic_values_for_each_x.csv')#, nrows=3)  # use nrows=3 to test the program
+Bins = pd.read_csv('./Files/' + beamE + 'GeV_files/CT18NLO_' + beamE + 'GeV_from' + NQ2bins + 'x' + Nxbins + 'grid_analytic_values_for_each_x.csv')#, nrows=3)  # use nrows=3 to test the program
 print("Bins:", Bins)
 Bins.rename(columns = {'Q2 (GeV^2)':'Q2'}, inplace = True)
 # Where to save the data
-savefile_dir = '/w/eic-scshelf2104/users/gsevans/8thWeekSULIs22/' + beamE + '\
+savefile_dir = './Files/' + beamE + '\
 GeV_files/'
 savefile_append = '_' + beamE + 'GeV_q_PDF_vals_1x' + Nxbins + 'grid.csv'
 
 # Declare the PDFs to be used
-Grid = ['NNPDF40_nlo_as_01180', 'PDF4LHC21_40', 'CT18NLO', 'NNPDF31_nlo_as_0118']  # Names of the PDFs you wish to use
-N_PDF = [101, 41, 59, 101]  # Number of PDFs for each Grid
-base = ["replica", "Hessian", "Hessian", "replica"] 
+Grid = ['NNPDF40_nlo_as_01180', 'PDF4LHC21_40', 'CT18NLO']#, 'NNPDF31_nlo_as_0118']  # Names of the PDFs you wish to use
+N_PDF = [101, 41, 59]#, 101]  # Number of PDFs for each Grid
+base = ["replica", "Hessian", "Hessian"]#, "replica"]  # base of the Grid
 
 # Turn on/off the following capabilities
-find_unc = False  # Calculate the PDF uncertainties
-real_data = True  # Generate PDF values (vs using pre-calculated values)
-make_plots = True  # Plot graphs
+find_unc = True  # Calculate the PDF uncertainties
+make_plots = False  # Plot graphs
 save_data = True  # Save PDF values (& PDF unc) to csv files
 
 ### END USER INPUT ###
@@ -103,8 +103,8 @@ fig, ax = plt.subplots()
 all_data = {}  # dict for storing dataframes for each PDF
 
 # Define constants
-G_F = 1.16637e-5  # GeV^2 Fermi constant
-alpha = 7.29735e-3  # Fine structure constant
+G_F = 1.16638e-5  # GeV^2 Fermi constant
+alpha = 7.29735256e-3  # Fine structure constant
 
 for i, name in enumerate(Grid):
     print("\n\n PDF number {}, ".format(i) + name)
@@ -115,10 +115,10 @@ for i, name in enumerate(Grid):
         if find_unc:
             q_PDF_unc.append(calc_unc(row, name, N_PDF[i], base[i]))
         print(index, row)
-    print("q PDF unc", q_PDF_unc)
-    #print("dv_uV: ", dV_uV)
-    #print("dv_uV unc: ", dV_uV_unc)
-    q_PDF_vals = np.array(q_PDF_vals)
+
+    q_PDF_vals = np.array(q_PDF_vals)  # Change it to an array for easy math
+
+    # Calculate and store  valance quark and total quark PDF values
     PDF_vals = pd.DataFrame(data=Bins.loc[:,'x'], columns=['x'])
     PDF_vals["d_V"] = q_PDF_vals[:,0] - q_PDF_vals[:,1]
     PDF_vals["u_V"] = q_PDF_vals[:,2] - q_PDF_vals[:,3]
@@ -128,8 +128,10 @@ for i, name in enumerate(Grid):
     PDF_vals["u_p"] = q_PDF_vals[:,2] + q_PDF_vals[:,3]
     PDF_vals["s_p"] = q_PDF_vals[:,4] + q_PDF_vals[:,5]
     PDF_vals["c_p"] = q_PDF_vals[:,6] + q_PDF_vals[:,7]
-    PDF_vals["dV/uV"] = PDF_vals["d_V"] / PDF_vals["u_V"]
+    # Calculate and store the PDF value for d_V/u_V
+    PDF_vals["dV/uV"] = PDF_vals["d_V"] / PDF_vals["u_V"] 
 
+    # Store quark PDF values
     PDF_vals["d"] = q_PDF_vals[:,0]
     PDF_vals["dbar"] = q_PDF_vals[:,1]
     PDF_vals["u"] = q_PDF_vals[:,2]
@@ -140,7 +142,8 @@ for i, name in enumerate(Grid):
     PDF_vals["cbar"] = q_PDF_vals[:,7]
     
     if find_unc:
-        q_PDF_unc = np.array(q_PDF_unc)
+        # Store PDF uncertainties for each quark
+        q_PDF_unc = np.array(q_PDF_unc)  # Changed to an array for easy math
         PDF_vals["d_unc"] = q_PDF_unc[:,0]
         PDF_vals["dbar_unc"] = q_PDF_unc[:,1]
         PDF_vals["u_unc"] = q_PDF_unc[:,2]
@@ -149,11 +152,14 @@ for i, name in enumerate(Grid):
         PDF_vals["sbar_unc"] = q_PDF_unc[:,5]
         PDF_vals["c_unc"] = q_PDF_unc[:,6]
         PDF_vals["cbar_unc"] = q_PDF_unc[:,7]
+        # Calculate and store the PDF uncertainty for d_V/u_V
         dV_unc = np.sqrt(PDF_vals["d_unc"] ** 2 + PDF_vals["dbar_unc"] ** 2)
         uV_unc = np.sqrt(PDF_vals["u_unc"] ** 2 + PDF_vals["ubar_unc"] ** 2)
         PDF_vals["(dV/uV)_unc"] = abs(PDF_vals["dV/uV"]) * \
             np.sqrt((dV_unc / PDF_vals["d_V"]) ** 2 + 
                     (uV_unc / PDF_vals["u_V"]) ** 2)
+    
+    # Store the dataframe in a dictionary labeled according to the PDF set used
     all_data[name] = PDF_vals
     print(PDF_vals)
     
@@ -169,17 +175,18 @@ for i, name in enumerate(Grid):
 print()
 print()
 print("all_data", all_data)
+
 if save_data:
     # Save the PDF values for each PDF to a CSV file
     for name in all_data.keys():
-        all_data[name].to_csv(savefile_dir + name + savefile_append, index=False) #this will include a header. To read in C++, maybe should remove it using header=False
+        all_data[name].to_csv(savefile_dir + name + savefile_append, index=False) #this will include a header. 
 
 if make_plots:
     # Plot extra info for help in understanding graph
     ax.plot([.15,.85], [0,0], '--k', label="zero")
     ax.text(.15, -.1, "Beam Polarization: " + str(bp))
     ax.text(.15, .05, "Runtime: " + str(runtime) + " days")
-    ax.text(.15, .75, "$\delta O = \sqrt{\\frac{1}{4}\sum_{k=1}^{k=\\frac{N_{PDF}}{2}}(O_{2k}-O_{2k-1})^2}$")
+    #ax.text(.15, .75, "$\delta O = \sqrt{\\frac{1}{4}\sum_{k=1}^{k=\\frac{N_{PDF}}{2}}(O_{2k}-O_{2k-1})^2}$")  # Uncertainty equation for Hessian based PDFs
 
     # Plot labels and formatting
     plt.ylim(-1,1)

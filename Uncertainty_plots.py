@@ -7,11 +7,11 @@ import seaborn as sns
 plt.close('all')
 
 # Variables to change if changing BEAM_E
-BEAM_E = '11'  # GeV
-NQ2bins = '14'  # max number of Q2 bins per x (14 for 11 GeV and 30 for 22 GeV)
+BEAM_E = '22'  # GeV
+NQ2bins = '30'  # max number of Q2 bins per x (14 for 11 GeV and 30 for 22 GeV)
 # How many rows at the bottom of each CSV file to ignore
 # 11 GeV: [0, 0, 5]; 22 GeV [2, 1, 6]
-footer_vals = [0, 0, 5]  # [2, 1, 6]  
+footer_vals = [2, 1, 6]  
 
 # Variables to maybe change if changing BEAM_E
 
@@ -22,27 +22,27 @@ Nxbins_PDF = '100'
 PDF_names = ["CT18NLO"]  # Source PDF
 
 # Variables to store path information for the all bins
-dir_path_al = "/w/eic-scshelf2104/users/gsevans/8thWeekSULIs22/" + BEAM_E + \
+dir_path_al = "./Files/" + BEAM_E + \
               "GeV_files/"
 file_suffix_al = "_" + BEAM_E + "GeV_from" + NQ2bins + "x" + \
                  Nxbins_analytical + "grid_analytic_values_for_all_bins.csv"
 foot_al = footer_vals[0]  # How many rows at the bottom to ignore (2 for 22 GeV, 0 for 11 GeV)
 
 # Variables to store path information for the each x bins
-dir_path_ea = "/w/eic-scshelf2104/users/gsevans/8thWeekSULIs22/" + BEAM_E + \
+dir_path_ea = "./Files/" + BEAM_E + \
               "GeV_files/"
 file_suffix_ea = "_" + BEAM_E + "GeV_from" + NQ2bins + "x" + \
                  Nxbins_analytical + "grid_analytic_values_for_each_x.csv"
 foot_ea = footer_vals[1] # How many rows at the bottom to ignore (1 for 22 GeV, 0 for 11 GeV)
 
 # Variables to store path information for the PDF values
-dir_path_PDF = "/w/eic-scshelf2104/users/gsevans/8thWeekSULIs22/" + BEAM_E + \
+dir_path_PDF = "./Files/" + BEAM_E + \
                "GeV_files/"
 file_suffix_PDF = "_" + BEAM_E + "GeV_qPDF_vals_1x" + Nxbins_PDF + "grid.csv"
 foot_PDF = footer_vals[2]  # How many rows at the bottom to ignore(6 for 22 GeV, 5 for 11 GeV)
 
 # Where to save the picture
-dir_path_pic = "/w/eic-scshelf2104/users/gsevans/8thWeekSULIs22/" + BEAM_E + \
+dir_path_pic = "./Files/" + BEAM_E + \
                "GeV_files/"
 pic_type = ".pdf"  # What file type to save the picture as
 
@@ -82,7 +82,6 @@ for pdf_name in PDF_names:
     numQ2 = len(uniqueQ2)
     xticks = np.linspace(start=0, stop=numx, num=numx+1)
     Q2ticks = np.linspace(start=0, stop=numQ2, num=numQ2+1)
-    print(xticks, Q2ticks)
 
     # A statistical heatmaps
     Aplot_width = 8.5
