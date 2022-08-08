@@ -9,7 +9,7 @@
 #include <map> //Error Matrix --- use map to store the entires --- then fill the matrix
 #include "TComplex.h"
 #include "TMatrixT.h"
-#include <TCanvas.h> // . Added this and below T things for plotting. Some may not be necessary
+#include <TCanvas.h> // Added this and below T things for plotting. Some may not be necessary
 #include <TGraph.h> 
 #include <TLegend.h>
 #include "TGraphErrors.h"
@@ -26,9 +26,9 @@ const Double_t RUNTIME_DAYS = 90.0;  // Number of days the experiment runs
 const Double_t BEAM_POLARIZ = 0.85;  // Beam polarization
 const Double_t SIN2_TH = 0.235;  // Sin^2(theta_w), (theta_w = weak mixing angle)
 const string PDF_NAME = "CT18NLO";
-Double_t BEAM_E = 22;  // GeV
-const string NQ2BINS = "30";  // Max # of Q2 bins (30 for 22 GeV, 14 for 11 GeV)
-const string NXBINS = "10";  // Max # of x bins
+Double_t BEAM_E = 11;  // GeV
+const string NQ2BINS = "14";  // Max # of Q2 bins (30 for 22 GeV, 14 for 11 GeV), *10 for fine Q2
+const string NXBINS = "10";  // Max # of x bins (10 normal, 100 for fine x)
 // Q2 v x grid file directory and name
 const string INFILE_DIR = "./Files/" + to_string(int(BEAM_E)) + "GeV_files/";
 const string INFILE_NAME = "Q2x_" + NQ2BINS + "x" + NXBINS + "_rateGrid_" + \
@@ -42,19 +42,14 @@ const string OUTFILE_XBINS = PDF_NAME + "_" + to_string(int(BEAM_E)) +
 const string OUTFILE_FITS = PDF_NAME + "_" + to_string(int(BEAM_E)) +
   "GeV_from" + NQ2BINS + "x" + NXBINS + "grid_fitted_values_for_each_x.csv";
 
-// Create a new type that can return two values  // uod
-struct Asym_Values{
-  double Fit_Val;
-  double Fixed_Val;
-};
-double r_prime=0.0;
+const Int_t MAXBINS = 500;  // 500 for most cases, but 5000 for finex-fineQ2 grid
+
+double r_prime=0.0;  // Storage for random number rprime
 
 // Constants
 const Double_t GF = 1.16638e-5;  // GeV^2, Fermi constant
 const Double_t ALPHA = 7.29735256e-3;  // Fine structure constant
 const Double_t MP = 0.93827;  // GeV/c^2 Mass of a proton
-
-const Int_t MAXBINS = 500; 
 
 //NOTE: The arrays are declared with fixed size, larger than what is needed for any file, to avoid overly complicated dynamic memory allocation
 Double_t Gx[MAXBINS];
@@ -72,42 +67,29 @@ Double_t GY[MAXBINS];
 
 Double_t GA_clean[MAXBINS];  // Predicted A with no noise
 Double_t GA_noisy[MAXBINS];  // Predicted A with noise added
-// .  Some of these might not need to be global:
+// (Some of these below might not need to be global:)
 Double_t GA_cor_shift[MAXBINS];  // Pred. A w/ uncor. noise shifted by 1sigma cor
 Double_t GA_clean_sim[MAXBINS];  // Predicted A ignoring sea quarks
 Double_t GA_fit[MAXBINS];  // Container for the fitted A value
 
-// . Add the G for Global
 // Global so can be used in error matrix
 Double_t dA_stat[MAXBINS];  // Statistical error in A
 Double_t dA_sys_uncor[MAXBINS];  // Uncorrelated systematic error in A
 Double_t GdA_tot_uncor[MAXBINS];  // Total uncor error (stat+uncor sys) in A
 Double_t dA_sys_cor[MAXBINS];  // Correlated systematic error in A
 
-Double_t Ggoodness[MAXBINS];  // . Use or delete uod
+// (When time, turn these to not global variables)
+Double_t GA_const[MAXBINS]; 
 
-// . As time turn these to not global variables
-Double_t GA_const[MAXBINS];  // . added this
-
-
-Int_t start_i = 0;  // . added Values for when to start the next xdescribe what these are for
+Int_t start_i = 0;  // Values for when to start the next x
 Int_t stop_i = 0;
 
-const vector<string> PDF_names = {"CT18NLO", "CT18NLO"};//"PDF4LHC21_40"};  // Vector of  PDFs to analyze // . uod if use, move up uod. if del, fix below
+const vector<string> PDF_names = {"CT18NLO", "CT18NLO"};//"PDF4LHC21_40"};  // Vector of  PDFs to analyze // This was going to be used to loop through multiple PDFs
 std::vector<std::vector<double>> du_fitted(sizeof(PDF_names), vector<double>(0));
 std::vector<std::vector<double>> du_f_err(sizeof(PDF_names), vector<double>(0));
 std::vector<std::vector<double>> du_x(sizeof(PDF_names), vector<double>(0));
 
-std::vector<double> sinq2_val[6];  // . uod (use or delete)
-std::vector<double> chi_square[6];  // . uod
-
-double temporary_val =0.0;
-//double PDF_O_D[90][90][90];
-std::map<pair<int,int>, double> PDF_O_D;  // uod
-//PDF_O_D.clear();
-ofstream Outfile;  // . not sure how this works
-int error_type; // . uod
-int lum_sets=0; // . uod
+ofstream Outfile;
 
 // Prep for exporting data
 ofstream all_bins_file;
@@ -366,8 +348,7 @@ void calcAsym(string fileName, string pdfName, double beamE) {
     du_denominator = GA_cor_shift[i] + C_1d*GA_const[i] + C_2d*GY[i]*GA_const[i];
     double du_sys_cor_shift = du_numerator/du_denominator;
     duSum_sys_cor_shift += weight * du_sys_cor_shift;
-    double ddu_sys_cor_shift = du_noisy - du_sys_cor_shift; // . Is this useful?
-
+    double ddu_sys_cor_shift = du_noisy - du_sys_cor_shift; 
 
 
     // Checking uncertainty due to ignoring sea, s, and c quarks
@@ -460,9 +441,6 @@ void calcAsym(string fileName, string pdfName, double beamE) {
 
 double func(Double_t *par, Int_t i) {
 
-  // . Potentially delete new structure type Asym-Values or find a way to use it
-  //Asym_Values Asym; // can access to parts of Asym
-  
   // Coupling constants
   double C_1d = 1/2. - 2 * SIN2_TH / 3;
   double C_1u = -1/2. + 4 * SIN2_TH / 3;
@@ -483,8 +461,7 @@ double func(Double_t *par, Int_t i) {
 void fcn(Int_t &npar, Double_t *gin, Double_t &f, Double_t *par, Int_t iflag) {
 
   // Create and fill error matrix
-  //Asym_Values Calculation;  // . Commented out. Use or delete this line
-  int nbins = stop_i - start_i;  // . indicate that those are global
+  int nbins = stop_i - start_i;  
   TMatrixT<double> Err_matrix(nbins, nbins);
   TMatrixT<double> Stat_Err_matrix(nbins, nbins);
   for (int i=0; i<nbins; i++) {
@@ -528,7 +505,7 @@ void fcn(Int_t &npar, Double_t *gin, Double_t &f, Double_t *par, Int_t iflag) {
 //______________________________________________________________________________
 
 int main(Int_t argc, char *argv[]) {
-  // . Doesn't actually need argc anymore, but I don't know how to get rid of it
+  // (Doesn't actually need argc anymore, but I don't know how to get rid of it)
   if(argc < 1) {
     cout << "Please call with appropriate arguments:" << endl;
     cout << endl;
@@ -540,16 +517,16 @@ int main(Int_t argc, char *argv[]) {
   double beamE = BEAM_E; // GeV, beamline energy
   cout << endl << "Simulation File Parameters:" << endl;
   cout << "File name: " << fileName << endl;
-  cout << "Without unfolding" << endl;   // . What does this mean?
   cout << "Polarization: " << BEAM_POLARIZ << endl << endl;
   
   // Read data from the file and calculate analytical values
+  // (This is where the analysis for Summer22 d/u projection gets done)
   calcAsym(fileName, PDF_NAME, beamE);  
 
   // Fit the data
+  // (This wasn't used in Summer22 results even though it was adapted to fit d/u)
 
   int i = 0;
-  cout << "Gx[i]" << Gx[i]; 
   // Loop through all x's
   while (Gx[i] > 0) {
 
@@ -620,6 +597,7 @@ int main(Int_t argc, char *argv[]) {
   memset(du_x_err_a, 0, length*sizeof(int));
 
   /*
+  // Print variables to be plotted as a check
   cout << endl <<endl << du_x[0].size() << endl;
   for(int i=0; i < du_x[0].size(); i++) {
     std::cout << " (du_x_a)[i]=" << (du_x_a)[i];
@@ -627,6 +605,8 @@ int main(Int_t argc, char *argv[]) {
     std::cout << " (du_f_err[0])[i]=" << (du_f_err_a)[i];
     std::cout << " (du_x_err[0])[i]=" << (du_x_err_a)[i] << endl;
     }*/
+
+  // Plot stuff and format the plot
 
   auto gr = new TGraphErrors((du_x[0]).size(), du_x_a, du_f_a, du_x_err_a, du_f_err_a);
 
@@ -647,6 +627,6 @@ int main(Int_t argc, char *argv[]) {
   legend->AddEntry(lineplot,"CT18NLO","PL");
   legend->Draw("same");
   c1->Update();
-  c1->SaveAs("du_plot.png");
+  c1->SaveAs("main_du_plot.png");
   return 0;
 }

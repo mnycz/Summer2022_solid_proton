@@ -40,14 +40,14 @@ bool Is_Rad = false; //whether we use the rate w/o ineternal and pre-vertex rad 
                      //for eDIS generator, there is no internal and pre-vertex rad effects
                      //only the eAll generator has
 
+// This program assumes the simulation file is located at /lustre19/expphy/volatile/halla/triton/mnycz/SOLID/ and that it is named nt_PVDIS_term where "term" is the first term of kKeyList 
 const char* kKeyList[]={
-  "solid_PVDIS_LH2_moved_full_eAll_filenum100_22GeV_Z10cm_1e6","eDIS_11G", "pDIS_11G", "eDIS_11G_bg", "pDIS_11G_bg",
+  "eAll_commited4fe_rod_6mm_11_LH2_100files_1e6","eDIS_11G", "pDIS_11G", "eDIS_11G_bg", "pDIS_11G_bg",
     "eDIS_nobaffle_11G", "pDIS_nobaffle_11G", "eDIS_nobaffle_11G_bg", "pDIS_nobaffle_11G_bg",
     "eDIS_6.6G", "pDIS_6.6G", "eDIS_6.6G_bg", "pDIS_6.6G_bg",
     "eDIS_nobaffle_6.6G", "pDIS_nobaffle_6.6G", "eDIS_nobaffle_6.6G_bg", "pDIS_nobaffle_6.6G_bg",
     "_eAll_11G", "unknown"
 };// "eAll_commited4fe_rod_6mm_11_LH2_100files_1e6" // 11 GeV
-//"eAll_commitd6fc41a0_rod_6mm_22_LH_norad_1e6" // OLD 22 GeV
 //"solid_PVDIS_LH2_moved_full_eAll_filenum100_22GeV_Z10cm_1e6" // Fixed 22 GeV
 
 const int Nbin=15;
@@ -77,8 +77,8 @@ void TH2toTxt(TH2* h2, const char* key, bool skipZero=false)
     }
     FILE * pFile;
     char buf[255];
-    // . "/w/eic-scshelf2104/users/gsevans/thirdWeekSULIs22/files_11GeV/%s_%s.txt"
-    pFile = fopen (Form("./Files/22GeV_files/%s_%s.txt",h2->GetName(),key), "w");
+    // pFile is where the text file(s) will be saved. 
+    pFile = fopen (Form("./Files/11GeV_files/%s_%s.txt",h2->GetName(),key), "w");
     fprintf(pFile,"     x     Q2  rate(Hz)\n");
     TAxis *xAxis = h2->GetXaxis();
     TAxis *yAxis = h2->GetYaxis();
@@ -158,9 +158,12 @@ void analysis_PVDIS_FOM_sim(const char* infile, const char* key, double beam=11.
     double Q2_sum[15] = {0};
     double y_sum[15] = {0};
 
-    int nBinQ2=30; // 14 for 11 GeV, 30 for 22 GeV
-    double Q2Min=0.0,Q2Max=30; //14 for 11 GeV, 30 for 22 GeV
-    double nBinx=10;  // 10 for analytic calculations, 100 for PDF
+    // Characteristics of the grid
+    int nBinQ2=140; // 14 for 11 GeV, 30 for 22 GeV, *10 if getting fine Q2
+    double Q2Min=0.0,Q2Max=14; //14 for 11 GeV, 30 for 22 GeV
+    double nBinx=100;  // 10 for analytic calculations, 100 if getting fine x
+
+
     if(beam>1.0 && beam<7.0) {
      nBinQ2=70;
      Q2Min=0.0;
@@ -219,7 +222,9 @@ void analysis_PVDIS_FOM_sim(const char* infile, const char* key, double beam=11.
     
     hAbeamErr_Q2x_acc->Divide(hAbeamErr_Q2x_acc,hAbeam_Q2x_acc);
     
-    /* This section is commented out since it isn't needed when creating grids
+    /* This section is commented out since it isn't needed when creating grids. It creates various plots and other files that aren't needed and slow the program down.
+
+
     TCanvas *c_AbeamErr_Q2x_acc = new TCanvas("AbeamErr_Q2x_acc","AbeamErr_Q2x_acc",900,600);
     gPad->SetGrid();
 
@@ -285,6 +290,7 @@ void analysis_PVDIS_FOM_sim(const char* infile, const char* key, double beam=11.
     c1->SaveAs(Form("rate_Q2x_NoTrigEff_%.0fuA_%s.C",current_uA,key));
     */
     
+    // Does something that saves the Q2,x grid to a text file
     TH2toTxt(hrate_Q2x_acc,key,true);
     
     ///TH2toTxt(hrate_Q2x_NoTrigEff,key,true);
@@ -312,7 +318,7 @@ void ana()
 
 void ana_baffle()
 {
-  analysis_PVDIS_FOM_sim(0,11,3.0); 
+  analysis_PVDIS_FOM_sim(0,11,3.0); // The spot where the 11 is corresponds to beam energy. However, the program only uses it to check if it is 7 or less
   // analysis_PVDIS_FOM_sim(1,11,3.0);
 
   //analysis_PVDIS_FOM_sim(8,6.6,3.0);

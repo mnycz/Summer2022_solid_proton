@@ -59,7 +59,6 @@ def calc_unc(row, Grid, N_PDF, base):
         O_0 = np.array(get_q_PDF_vals(row, Grid, 0))
         for m in range(1, N_PDF):
             dO += (np.array(get_q_PDF_vals(row, Grid, m)) - O_0) ** 2
-            #print("TESTING", N_PDF, m)
         dO = np.sqrt(dO / N_PDF)
     else:
         print("The submitted base for", Grid, "was not recognized.", \
@@ -77,12 +76,11 @@ runtime = 90  # days of runtime (this is only used for display in the plot)
 bp = .85  # Beam polarization (this is only used for display in the plot)
 
 # Load the data
-Bins = pd.read_csv('./Files/' + beamE + 'GeV_files/CT18NLO_' + beamE + 'GeV_from' + NQ2bins + 'x' + Nxbins + 'grid_analytic_values_for_each_x.csv')#, nrows=3)  # use nrows=3 to test the program
+Bins = pd.read_csv('./Files/' + beamE + 'GeV_files/CT18NLO_' + beamE + 'GeV_from' + NQ2bins + 'x' + Nxbins + 'grid_analytic_values_for_each_x.csv')#, nrows=3)  # use nrows=3 when testing the program since it'll take less time
 print("Bins:", Bins)
 Bins.rename(columns = {'Q2 (GeV^2)':'Q2'}, inplace = True)
 # Where to save the data
-savefile_dir = './Files/' + beamE + '\
-GeV_files/'
+savefile_dir = './Files/' + beamE + 'GeV_files/'
 savefile_append = '_' + beamE + 'GeV_q_PDF_vals_1x' + Nxbins + 'grid.csv'
 
 # Declare the PDFs to be used
@@ -152,7 +150,7 @@ for i, name in enumerate(Grid):
         PDF_vals["sbar_unc"] = q_PDF_unc[:,5]
         PDF_vals["c_unc"] = q_PDF_unc[:,6]
         PDF_vals["cbar_unc"] = q_PDF_unc[:,7]
-        # Calculate and store the PDF uncertainty for d_V/u_V
+        # Calculate and store the PDF uncertainty for d_V/u_V 
         dV_unc = np.sqrt(PDF_vals["d_unc"] ** 2 + PDF_vals["dbar_unc"] ** 2)
         uV_unc = np.sqrt(PDF_vals["u_unc"] ** 2 + PDF_vals["ubar_unc"] ** 2)
         PDF_vals["(dV/uV)_unc"] = abs(PDF_vals["dV/uV"]) * \

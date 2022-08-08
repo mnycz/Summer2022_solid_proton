@@ -41,7 +41,7 @@ foot_PDF = 0
 dir_path_pic = "./Files/" + BEAM_E + "GeV_files/"
 pic_suffix = "main_dVuV_uncertainty_plot" + BEAM_E + "GeV.pdf"
 
-# Begin program
+# END USER INPUT
 
 # Plot stuff
 alp = .4  # Transparency in bands

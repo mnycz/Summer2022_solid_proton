@@ -10,8 +10,10 @@ plt.close('all')
 BEAM_E = '22'  # GeV
 NQ2bins = '30'  # max number of Q2 bins per x (14 for 11 GeV and 30 for 22 GeV)
 # How many rows at the bottom of each CSV file to ignore
-# 11 GeV: [0, 0, 5]; 22 GeV [2, 1, 6]
-footer_vals = [2, 1, 6]  
+# 11 GeV: [0, 0, 5, 0]; 22 GeV [2, 1, 6, 0]
+footer_vals = [2, 1, 6, 0]  
+#Aff_vmax = 5000  # Max value for color in the fine-Q2 fine-x plot(11:1.5k,22:5k)
+
 
 # Variables to maybe change if changing BEAM_E
 
@@ -22,28 +24,30 @@ Nxbins_PDF = '100'
 PDF_names = ["CT18NLO"]  # Source PDF
 
 # Variables to store path information for the all bins
-dir_path_al = "./Files/" + BEAM_E + \
-              "GeV_files/"
+dir_path_al = "./Files/" + BEAM_E + "GeV_files/"
 file_suffix_al = "_" + BEAM_E + "GeV_from" + NQ2bins + "x" + \
                  Nxbins_analytical + "grid_analytic_values_for_all_bins.csv"
 foot_al = footer_vals[0]  # How many rows at the bottom to ignore (2 for 22 GeV, 0 for 11 GeV)
 
 # Variables to store path information for the each x bins
-dir_path_ea = "./Files/" + BEAM_E + \
-              "GeV_files/"
+dir_path_ea = "./Files/" + BEAM_E + "GeV_files/"
 file_suffix_ea = "_" + BEAM_E + "GeV_from" + NQ2bins + "x" + \
                  Nxbins_analytical + "grid_analytic_values_for_each_x.csv"
 foot_ea = footer_vals[1] # How many rows at the bottom to ignore (1 for 22 GeV, 0 for 11 GeV)
 
 # Variables to store path information for the PDF values
-dir_path_PDF = "./Files/" + BEAM_E + \
-               "GeV_files/"
+dir_path_PDF = "./Files/" + BEAM_E + "GeV_files/"
 file_suffix_PDF = "_" + BEAM_E + "GeV_qPDF_vals_1x" + Nxbins_PDF + "grid.csv"
 foot_PDF = footer_vals[2]  # How many rows at the bottom to ignore(6 for 22 GeV, 5 for 11 GeV)
 
+# Variables to store path information for the fine-Q2 vs fine-x values
+dir_path_ff = "./Files/" + BEAM_E + "GeV_files/"
+file_suffix_ff = "_" + BEAM_E + "GeV_from" + str(int(NQ2bins)*10) + "x" + \
+                 Nxbins_PDF + "grid_analytic_values_for_all_bins.csv"
+foot_ff = footer_vals[3]  # How many rows at the bottom to ignore(6 for 22 GeV, 5 for 11 GeV)
+
 # Where to save the picture
-dir_path_pic = "./Files/" + BEAM_E + \
-               "GeV_files/"
+dir_path_pic = "./Files/" + BEAM_E + "GeV_files/"
 pic_type = ".pdf"  # What file type to save the picture as
 
 def frame(ax, grid):
@@ -61,6 +65,8 @@ for pdf_name in PDF_names:
                           skipfooter=foot_ea)
     data_PDF = pd.read_csv(dir_path_PDF + pdf_name + file_suffix_PDF, \
                            skipfooter=foot_PDF)
+    data_ff = pd.read_csv(dir_path_ff + pdf_name + file_suffix_ff, \
+                          skipfooter=foot_ff)
 
     # Set up ticks and tick labels
     # Create arrays of the unique x values and y values
@@ -86,12 +92,13 @@ for pdf_name in PDF_names:
     # A statistical heatmaps
     Aplot_width = 8.5
     Aplot_height = 5.5
-
-    # A_noisy heatmap on Q2 vs x
+    
+    # A_clean heatmap on Q2 vs x
     plt.figure(figsize=[Aplot_width, Aplot_height])
-    AGrid = data_al[['x','Q2 (GeV^2)','A_noisy']].copy() * 1000000
-    AGrid = AGrid.pivot(index='Q2 (GeV^2)', columns='x', values='A_noisy')
-    ax = sns.heatmap(AGrid, cbar_kws={'label': '$A_{PV}$ (ppm)'}, annot=True,
+    AGrid = data_al[['x','Q2 (GeV^2)','A_clean']].copy() * 1000000 # I should have multiplied the individual column by 1000000, but this works somehow
+    AGrid = AGrid.pivot(index='Q2 (GeV^2)', columns='x', values='A_clean')
+    ax = sns.heatmap(AGrid, cbar_kws={'label': '$A_{PV}^{theory}$ (ppm)'}, 
+                     annot=True,
                      cmap="RdYlBu_r") # https://stackoverflow.com/a/42092328
     ax.invert_yaxis()  # https://stackoverflow.com/a/34444939
     plt.ylabel('$Q^2$ (GeV$^2$)')
@@ -102,17 +109,19 @@ for pdf_name in PDF_names:
     ax.set_yticklabels(Q2labels)
     frame(ax, AGrid)
     plt.grid(linestyle='--', linewidth=0.5)
-    plt.savefig(dir_path_pic + "Anoisy_Q2xbin_heatmap_" + 
+    plt.savefig(dir_path_pic + "Aclean_Q2xbin_heatmap_" + 
                 BEAM_E + "GeV" + pic_type)
     
-    # dA_stat/A_noisy heatmap on Q2 vs x
+    # dA_stat/A_clean heatmap on Q2 vs x
     plt.figure(figsize=[Aplot_width, Aplot_height])
     dAAGrid = data_al[['x','Q2 (GeV^2)']].copy()
-    dAAGrid = pd.concat([dAAGrid, data_al['dA_stat'] / data_al['A_noisy']], axis=1)
-    dAAGrid.rename(columns={0:'dA_stat/A_noisy'}, inplace=True)
+    dAAGrid = pd.concat([dAAGrid, data_al['dA_stat'] / data_al['A_clean']], 
+                        axis=1)
+    dAAGrid.rename(columns={0:'dA_stat/A_clean'}, inplace=True)
     dAAGrid = dAAGrid.pivot(index='Q2 (GeV^2)', columns='x', 
-                          values='dA_stat/A_noisy')
-    ax = sns.heatmap(dAAGrid, cbar_kws={'label': '$\\delta A_{stat}/A_{PV}$'}, 
+                          values='dA_stat/A_clean')
+    ax = sns.heatmap(dAAGrid, 
+                     cbar_kws={'label': '$\\delta A_{stat}/A_{PV}^{theory}$'}, 
                      annot=True, cmap="RdYlBu_r", vmin=-0.5)
     ax.invert_yaxis()  
     plt.ylabel('$Q^2$ (GeV$^2$)')
@@ -123,7 +132,7 @@ for pdf_name in PDF_names:
     ax.set_yticklabels(Q2labels)
     frame(ax, dAAGrid)
     plt.grid(linestyle='--', linewidth=0.5)
-    plt.savefig(dir_path_pic + "dAstat_Anoisy_Q2xbin_heatmap_" + 
+    plt.savefig(dir_path_pic + "dAstat_Aclean_Q2xbin_heatmap_" + 
                 BEAM_E + "GeV" + pic_type)
     
     # dA_stat heatmap on Q2 vs x
@@ -147,7 +156,8 @@ for pdf_name in PDF_names:
     # Rate heatmap on Q2 vs x
     plt.figure(figsize=[Aplot_width, Aplot_height])
     rateGrid = data_al[['x','Q2 (GeV^2)','rate (Hz)']].copy()
-    rateGrid = rateGrid.pivot(index='Q2 (GeV^2)', columns='x', values='rate (Hz)')
+    rateGrid = rateGrid.pivot(index='Q2 (GeV^2)', columns='x', 
+                              values='rate (Hz)')
     ax = sns.heatmap(rateGrid, cbar_kws={'label': 'rate (Hz)'}, annot=True,
                      cmap="RdYlBu_r")
     ax.invert_yaxis() 
@@ -160,6 +170,29 @@ for pdf_name in PDF_names:
     frame(ax, dAAGrid)
     plt.grid(linestyle='--', linewidth=0.5)
     plt.savefig(dir_path_pic + "rate_Q2xbin_heatmap_" + 
+                BEAM_E + "GeV" + pic_type)
+    
+
+
+    # A_clean heatmap on fine-Q2 vs fine-x grid
+    plt.figure(figsize=[Aplot_width, Aplot_height])
+    AffGrid = abs(data_ff[['x','Q2 (GeV^2)','A_clean']].copy() * 1000000)  # I should have multiplied the individual column by 1000000, but this works somehow
+    AffGrid = AffGrid.pivot(index='Q2 (GeV^2)', columns='x', values='A_clean')
+    ax = sns.heatmap(AffGrid, cbar_kws={'label': '$|A_{PV}^{theory}|$ (ppm)'},
+                     cmap="RdYlBu_r")#, vmax=Aff_vmax)
+    ax.invert_yaxis()  
+    plt.ylabel('$Q^2$ (GeV$^2$)')
+    plt.xlabel('$x$')
+    ax.set_xticks(xticks*10)
+    ax.set_yticks(Q2ticks*10)
+    ax.set_xticklabels(xlabels)
+    ax.set_yticklabels(Q2labels)
+    ax.axhline(y=0, color='k',linewidth=2)
+    ax.axhline(y=Q2ticks[-1]*10, color='k',linewidth=1)
+    ax.axvline(x=0, color='k',linewidth=1)
+    ax.axvline(x=xticks[-1]*10, color='k',linewidth=2)
+    plt.grid(linestyle='--', linewidth=0.5)
+    plt.savefig(dir_path_pic + "Ac_ff_Q2xbin_heatmap_" +
                 BEAM_E + "GeV" + pic_type)
 
 
@@ -178,7 +211,7 @@ for pdf_name in PDF_names:
     plt.xlabel('Bin Number #')
     plt.semilogy()
     plt.grid(linestyle='--', linewidth=0.5)
-    # Position the legend, 11GeV:(0.45,0.48), 22GeV: (0.50,0.55)
+    # Position the legend
     plt.legend(ncol=2, loc=(0.33,0.56))  # Poster placement: loc=(0.40,0.55))  
     plt.tight_layout(rect=[0.0, 0.01, 1, 1])
     plt.savefig(dir_path_pic + "ABin_uncertainty_comparison_plot_" + \
