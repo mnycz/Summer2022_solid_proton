@@ -14,7 +14,7 @@ EXECFILE  = eAll.$(MYOS).$(ARCH).exe
 SRCDIR   := src
 INCDIR   := include
 
-MainFile := SoLID_d_u_fit.cpp
+MainFile := SoLID_d_u_analysis.cpp
 
 
 #LHAPDF=/work/eic3/users/xiaochao/lhapdf630

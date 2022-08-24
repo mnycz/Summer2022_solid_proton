@@ -1,0 +1,30 @@
+#!/bin/bash
+# Setup ROOT -- do this:  "source setroot_CUE"
+# For sh family: use "export" instead of "setenv"
+# for MacOs you must also set DYLD_LIBRARY_PATH
+
+echo "ROOT 6.18.04 was compiled with gcc 4.8.5"
+echo "present default gcc is given by gcc -v: "
+gcc -v
+
+setenv PYTHON /apps/python/3.4.3
+
+# For csh family
+setenv ROOTSYS /u/apps/root/6.18.04/root
+setenv PATH ${PYTHON}/bin/:${ROOTSYS}/bin:${PATH}
+
+if (!($?LD_LIBRARY_PATH)) then
+  setenv LD_LIBRARY_PATH ${PYTHON}/lib:${ROOTSYS}/lib
+else
+  setenv LD_LIBRARY_PATH ${PYTHON}/lib:${ROOTSYS}/lib:${LD_LIBRARY_PATH}
+endif
+
+if (!($?PYTHONPATH)) then
+  setenv PYTHONPATH ${PYTHON}/lib:${ROOTSYS}/lib
+else
+  setenv PYTHONPATH ${PYTHON}/lib:${ROOTSYS}/lib:${PYTHONPATH}
+endif
+
+
+
+
